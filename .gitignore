@@ -1,0 +1,22 @@
+__pycache__/
+
+build/
+*.html
+*.pyd
+*.cpp
+!acelib/bytes_c.cpp
+!acelib/math3d_c.cpp
+!acelib/vxl_c.cpp
+!acelib/world_c.cpp
+
+old/
+test/
+packs/
+
+*.vxl
+
+# from cuwo
+winfix.py
+
+.idea/
+vs/

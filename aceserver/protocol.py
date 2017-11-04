@@ -5,6 +5,7 @@ from typing import *
 
 import enet
 
+import acescripts
 from acelib import packets, vxl, world
 from acelib.bytes import ByteWriter
 from acelib.constants import *
@@ -15,6 +16,8 @@ from aceserver.loaders import *
 
 class ServerProtocol(base.BaseProtocol):
     def __init__(self, *args, **kwargs):
+        super(ServerProtocol, self).__init__(*args, **kwargs, connection_factory=connection.ServerConnection)
+
         with open("normandie.vxl", "rb") as f:
             self.map: vxl.VXLMap = vxl.VXLMap(f.read())
 
@@ -42,7 +45,10 @@ class ServerProtocol(base.BaseProtocol):
 
         self.world_objects = []
 
-        super(ServerProtocol, self).__init__(*args, **kwargs, connection_factory=connection.ServerConnection)
+        self.connection_factory = connection.ServerConnection
+        # TODO: configs
+        acescripts.load_scripts(self, {"scripts": ["censor"]})
+
 
     async def run(self):
         await self.mode.init()
@@ -141,17 +147,17 @@ class ServerProtocol(base.BaseProtocol):
             chat_message.value = line
             await self.broadcast_loader(chat_message, predicate=predicate)
 
-    async def broadcast_chat_message(self, message: str, sender: connection.ServerConnection, team: team.Team=None):
-        predicate = lambda conn: conn.team == team if team else None
+    def broadcast_chat_message(self, message: str, sender: connection.ServerConnection, team: team.Team=None):
+        predicate = (lambda conn: conn.team == team) if team else None
         chat_type = ChatType.TEAM if team else ChatType.ALL
         return self.broadcast_message(message, player_id=sender.id, chat_type=chat_type, predicate=predicate)
 
-    async def broadcast_server_message(self, message: str, team: team.Team=None):
-        predicate = lambda conn: conn.team == team if team is not None else None
+    def broadcast_server_message(self, message: str, team: team.Team=None):
+        predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=ChatType.BIG, predicate=predicate)
 
-    async def broadcast_hud_message(self, message: str, team: team.Team=None):
-        predicate = lambda conn: conn.team == team if team is not None else None
+    def broadcast_hud_message(self, message: str, team: team.Team=None):
+        predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=ChatType.BIG, predicate=predicate)
 
     def get_state(self):

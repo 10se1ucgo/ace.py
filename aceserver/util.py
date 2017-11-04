@@ -1,4 +1,5 @@
-import asyncio
+import inspect
+import enum
 import ipaddress
 import struct
 from typing import Union, Tuple
@@ -23,8 +24,9 @@ class IDPool:
 
 
 class Event:
-    def __init__(self):
+    def __init__(self, early_return=False):
         self._funcs = []
+        self.early_return = early_return
 
     def __iadd__(self, other):
         if not callable(other):
@@ -39,8 +41,20 @@ class Event:
     def __call__(self, *args, **kwargs):
         for func in self._funcs:
             r = func(*args, **kwargs)
-            if asyncio.iscoroutine(r):
-                asyncio.ensure_future(r)
+            if self.early_return and r is not None:
+                return r
+
+class AsyncEvent(Event):
+    def __iadd__(self, other):
+        if not inspect.iscoroutinefunction(other):
+            raise TypeError("Event handler must be a coroutine.")
+        return super().__iadd__(other)
+
+    async def __call__(self, *args, **kwargs):
+        for func in self._funcs:
+            r = await func(*args, **kwargs)
+            if self.early_return and r is not None:
+                return r
 
 
 def static_vars(**kwargs):

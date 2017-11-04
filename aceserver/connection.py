@@ -41,12 +41,12 @@ class ServerConnection(base.BaseConnection):
         self.kills: int = 0
 
         self.wo: world.Player = self.protocol.create_world_object(world.Player)
-        # self.position: math3d.Vector3 = math3d.Vector3(0, 0, 0)
-        # self.orientation: Tuple[int, int, int] = (0, 0, 0)
-
         self.store = {}
 
         self._listeners: Dict[int, List[asyncio.Future]] = defaultdict(list)
+        # self.on_chat_message = util.AsyncEvent(early_return=True)
+        # self.on_chat_message = util.AsyncEvent(early_return=True)
+        # self.on_chat_message = util.AsyncEvent(early_return=True)
 
     async def on_connect(self, data: int):
         if data != PROTOCOL_VERSION:
@@ -302,7 +302,11 @@ class ServerConnection(base.BaseConnection):
     @on_loader_receive(packets.ChatMessage)
     async def recv_chat_message(self, loader: packets.ChatMessage):
         # exec(loader.value)
-        await self.protocol.broadcast_chat_message(loader.value,
+        hook = await self.on_chat_message(self, loader.value, loader.chat_type)
+        if hook is False:
+            return
+        message = hook or loader.value
+        await self.protocol.broadcast_chat_message(message,
                                                    sender=self,
                                                    team=self.team if loader.chat_type == ChatType.TEAM else None)
         # chat_message.player_id = self.id
@@ -366,6 +370,10 @@ class ServerConnection(base.BaseConnection):
     @property
     def orientation(self) -> math3d.Vector3:
         return self.wo.orientation
+
+    # TODO more hooks
+    on_chat_message = util.AsyncEvent(early_return=True)
+
 
     def __str__(self):
         return self.name

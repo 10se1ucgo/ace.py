@@ -11,10 +11,12 @@ class CensorScript:
 
     async def censor(self, connection: 'connection.ServerConnection', message: str, type: int):
         if any(really_bad_word in message for really_bad_word in self.really_bad_words):
+            # returning False completely cancels the hook, and prevents the message from being sent
             return False
 
         for bad_word in self.bad_words:
             message = message.replace(bad_word, "*" * len(bad_word))
+        # returning message cancels all further hooks, but replaces the message with our own version.
         return message
 
 

@@ -29,8 +29,7 @@ cdef class WorldObject:
 
 cdef class Player:
     def __cinit__(self, VXLMap map, *arg, **kwargs):
-        self.ply = new AcePlayer()
-        self.ply.map = map.map_data
+        self.ply = new AcePlayer(map.map_data)
         self.position = math3d.new_proxy_vector(&self.ply.p)
         self.velocity = math3d.new_proxy_vector(&self.ply.v)
         self.orientation = math3d.new_proxy_vector(&self.ply.f)

@@ -14,10 +14,21 @@ struct Orientation {
 };
 
 struct AcePlayer {
+    explicit AcePlayer(AceMap *map): f(1, 0, 0), s(0, 1, 0), h(0, 0, 1) {
+        this->map = map;
+        this->mf = this->mb = this->ml = this->mr = false;
+        this->jump = this->crouch = this->sneak = this->sprint = false;
+        this->primary_fire = this->secondary_fire = false;
+        this->airborne = this->wade = false;
+        this->alive = true;
+        this->weapon = 0;
+        this->lastclimb = 0.0f;
+    }
+
     AceMap *map;
-    bool mf, mb, ml, mr, jump, crouch, sneak, sprint, primary_fire, secondary_fire;
+    bool mf, mb, ml, mr, jump, crouch, sneak, sprint, primary_fire, secondary_fire, airborne, wade, alive;
     float lastclimb;
-    int airborne, wade, alive, weapon;
+    int weapon;
     Vec3f p, e, v, f, s, h;
 };
 

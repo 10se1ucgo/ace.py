@@ -402,22 +402,22 @@ cdef class ChangeEntity(Loader):
     cpdef read(self, ByteReader reader):
         self.entity_id = reader.read_uint8()
         self.type = reader.read_uint8()
-        if self.type == constants.ChangeEntityType.SET_POSITION.value:
+        if self.type == constants.SET.POSITION.value:
             self.position.read(reader)
-        elif self.type == constants.ChangeEntityType.SET_CARRIER.value:
+        elif self.type == constants.SET.CARRIER.value:
             self.carrier = reader.read_int8()
-        elif self.type == constants.ChangeEntityType.SET_STATE.value:
+        elif self.type == constants.SET.STATE.value:
             self.state = reader.read_uint8()
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
         writer.write_uint8(self.entity_id)
         writer.write_uint8(self.type)
-        if self.type == constants.ChangeEntityType.SET_POSITION.value:
+        if self.type == constants.SET.POSITION.value:
             self.position.write(writer)
-        elif self.type == constants.ChangeEntityType.SET_CARRIER.value:
+        elif self.type == constants.SET.CARRIER.value:
             writer.write_int8(self.carrier)
-        elif self.type == constants.ChangeEntityType.SET_STATE.value:
+        elif self.type == constants.SET.STATE.value:
             writer.write_uint8(self.state)
 
 
@@ -457,7 +457,7 @@ cdef class CreateEntity(Loader):
         # This is done likely because a newly created entity doesn't have a carrier
         self.entity.carrier = -1
         # Not sure why this is done. Setting entity directly with CreateEntity().entity doesn't do this.
-        self.entity.state = constants.TeamType.NEUTRAL.value
+        self.entity.state = constants.TEAM.NEUTRAL.value
 
 
 cdef class PlaySound(Loader):
@@ -730,7 +730,7 @@ cdef class StateData(Loader):
 
     def set_entities(self, entities):
         for ent in entities:
-            ent.state = constants.TeamType.NEUTRAL.value
+            ent.state = constants.TEAM.NEUTRAL.value
             ent.carrier = -1
             self.entities.append(ent)
 
@@ -867,7 +867,7 @@ cdef class ProgressBar(Loader):
         float progress, rate
         Color color1, color2
 
-    def __cnit__(self, ByteReader reader = None):
+    def __cinit__(self):
         self.color1 = Color()
         self.color2 = Color()
 
@@ -883,6 +883,14 @@ cdef class ProgressBar(Loader):
         writer.write_float(self.rate)
         self.color1.write(writer)
         self.color2.write(writer)
+
+    def set(self, float progress, float rate):
+        self.progress = progress
+        self.rate = rate
+
+    def stop(self):
+        self.progress = float('nan')
+        self.rate = 0
 
 
 cdef class Restock(Loader):

@@ -1,13 +1,14 @@
 from enum import IntEnum
 
-class WeaponType(IntEnum):
+
+class WEAPON(IntEnum):
     SEMI = 0
     SMG = 1
     SHOTGUN = 2
     RPG = 3
 
 
-class HitType(IntEnum):
+class HIT(IntEnum):
     TORSO = 0
     HEAD = 1
     ARMS = 2
@@ -15,7 +16,7 @@ class HitType(IntEnum):
     MELEE = 4
 
 
-class ToolType(IntEnum):
+class TOOL(IntEnum):
     SPADE = 0
     BLOCK = 1
     WEAPON = 2
@@ -23,26 +24,26 @@ class ToolType(IntEnum):
     RPG = 4
 
 
-class BAType(IntEnum):
+class ACTION(IntEnum):
     BUILD = 0
     DESTROY = 1
     SPADE = 2
     GRENADE = 3
 
 
-class ChatType(IntEnum):
+class CHAT(IntEnum):
     ALL = 0
     TEAM = 1
     SYSTEM = 2
     BIG = 3
 
 
-class ScoreType(IntEnum):
+class SCORE(IntEnum):
     TEAM = 0
     PLAYER = 1
 
 
-class EntityType(IntEnum):
+class ENTITY(IntEnum):
     FLAG = 0
     BASE = 1
     HELICOPTER = 2
@@ -50,7 +51,7 @@ class EntityType(IntEnum):
     HEALTH_CRATE = 4
 
 
-class KillType(IntEnum):
+class KILL(IntEnum):
     WEAPON = 0
     HEADSHOT = 1
     MELEE = 2
@@ -60,7 +61,7 @@ class KillType(IntEnum):
     CLASS_CHANGE = 6
 
 
-class DisconnectType(IntEnum):
+class DISCONNECT(IntEnum):
     UNDEFINED = 0
     BANNED = 1
     KICKED = 2
@@ -68,19 +69,19 @@ class DisconnectType(IntEnum):
     FULL = 4
 
 
-class ChangeEntityType(IntEnum):
-    SET_STATE = 0
-    SET_POSITION = 1
-    SET_CARRIER = 2
+class SET(IntEnum):
+    STATE = 0
+    POSITION = 1
+    CARRIER = 2
 
 
-class DamageType(IntEnum):
+class DAMAGE(IntEnum):
     SELF = 0
     OTHER = 1
     HEAL = 3
 
 
-class TeamType(IntEnum):
+class TEAM(IntEnum):
     SPECTATOR = -1
     TEAM1 = 0
     TEAM2 = 1

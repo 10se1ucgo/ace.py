@@ -1,5 +1,5 @@
 from acelib import packets
-from acelib.constants import ToolType
+from acelib.constants import TOOL
 
 __all__ = [
     "create_player", "position_data", "orientation_data", "input_data", "rpg_packet", "grenade_packet",
@@ -15,9 +15,9 @@ position_data = packets.PositionData()
 orientation_data = packets.OrientationData()
 input_data = packets.InputData()
 rpg_packet = packets.UseOrientedItem()
-rpg_packet.tool = ToolType.RPG
+rpg_packet.tool = TOOL.RPG
 grenade_packet = packets.UseOrientedItem()
-grenade_packet.tool = ToolType.GRENADE
+grenade_packet.tool = TOOL.GRENADE
 set_tool = packets.SetTool()
 set_color = packets.SetColor()
 fog_color = packets.FogColor()

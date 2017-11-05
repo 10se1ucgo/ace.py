@@ -1,5 +1,5 @@
 import inspect
-import enum
+import traceback
 import ipaddress
 import struct
 from typing import Union, Tuple
@@ -24,9 +24,10 @@ class IDPool:
 
 
 class Event:
-    def __init__(self, early_return=False):
+    def __init__(self, overridable=False):
         self._funcs = []
-        self.early_return = early_return
+        # TODO decide a name for this LUL
+        self.overridable = overridable
 
     def __iadd__(self, other):
         if not callable(other):
@@ -40,8 +41,13 @@ class Event:
 
     def __call__(self, *args, **kwargs):
         for func in self._funcs:
-            r = func(*args, **kwargs)
-            if self.early_return and r is not None:
+            try:
+                r = func(*args, **kwargs)
+            except Exception:
+                print(f"Ignoring exception in event hook {func}")
+                traceback.print_exc()
+                continue
+            if self.overridable and r is not None:
                 return r
 
 class AsyncEvent(Event):
@@ -52,8 +58,13 @@ class AsyncEvent(Event):
 
     async def __call__(self, *args, **kwargs):
         for func in self._funcs:
-            r = await func(*args, **kwargs)
-            if self.early_return and r is not None:
+            try:
+                r = await func(*args, **kwargs)
+            except Exception:
+                print(f"Ignoring exception in event hook {func}")
+                traceback.print_exc()
+                continue
+            if self.overridable and r is not None:
                 return r
 
 

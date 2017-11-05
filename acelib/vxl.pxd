@@ -7,7 +7,7 @@ cdef extern from "vxl_c.h" nogil:
         int x, y, z
 
     cdef cppclass AceMap:
-        AceMap(uint32_t *buf=NULL) except +
+        AceMap(uint8_t *buf) except +
         void read(uint8_t *buf) except +
         vector[uint8_t] write() except +
 

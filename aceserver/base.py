@@ -37,7 +37,7 @@ class BaseProtocol:
 
         # start = self.loop.time()
         last: float = self.loop.time()
-        while True:
+        while self.loop.is_running():
             now = self.loop.time()
             dt = now - last
             self.time += dt
@@ -45,6 +45,14 @@ class BaseProtocol:
             await asyncio.sleep(1 / 64)
             # print(self.time, now - start, 1 / (dt or 1))
             last = now
+
+    def stop(self):
+        print("Shutting down...")
+        for conn in self.connections:
+            conn.disconnect()
+        print("Disconnected clients")
+        self.host.flush()
+        print("Flushed host")
 
     async def update(self, dt):
         await self.net_update(dt)

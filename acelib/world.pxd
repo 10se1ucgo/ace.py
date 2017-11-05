@@ -4,6 +4,8 @@ from libcpp cimport bool
 
 cdef extern from "world_c.cpp" nogil:
     cdef cppclass AcePlayer:
+        AcePlayer(AceMap *map) except +
+
         AceMap *map
         bool mf, mb, ml, mr, jump, crouch, sneak, sprint, primary_fire, secondary_fire
         float lastclimb

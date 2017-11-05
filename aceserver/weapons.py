@@ -58,6 +58,7 @@ class Tool:
         return True
 
     def restock(self):
+        self.primary_ammo = self.max_primary  # bug? client seems to think it should
         self.secondary_ammo = self.max_secondary
 
 
@@ -93,7 +94,7 @@ class Weapon(Tool):
     reload_time = 0
     one_by_one = False
 
-    damage = {HitType.TORSO: None, HitType.HEAD: None, HitType.ARMS: None, HitType.LEGS: None}
+    damage = {HIT.TORSO: None, HIT.HEAD: None, HIT.ARMS: None, HIT.LEGS: None}
 
     def __init__(self, connection: 'connection.ServerConnection'):
         super().__init__(connection)
@@ -164,7 +165,7 @@ class Weapon(Tool):
 
 
 class Semi(Weapon):
-    type = WeaponType.SEMI
+    type = WEAPON.SEMI
     name = "Rifle"
 
     max_primary = 10
@@ -175,11 +176,11 @@ class Semi(Weapon):
     reload_time = 2.5
     one_by_one = False
 
-    damage = {HitType.TORSO: 49, HitType.HEAD: 100, HitType.ARMS: 33, HitType.LEGS: 33}
+    damage = {HIT.TORSO: 49, HIT.HEAD: 100, HIT.ARMS: 33, HIT.LEGS: 33}
 
 
 class SMG(Weapon):
-    type = WeaponType.SMG
+    type = WEAPON.SMG
     name = "SMG"
 
     max_primary = 30
@@ -190,11 +191,11 @@ class SMG(Weapon):
     reload_time = 2.5
     one_by_one = False
 
-    damage = {HitType.TORSO: 24, HitType.HEAD: 75, HitType.ARMS: 16, HitType.LEGS: 16}
+    damage = {HIT.TORSO: 24, HIT.HEAD: 75, HIT.ARMS: 16, HIT.LEGS: 16}
 
 
 class Shotgun(Weapon):
-    type = WeaponType.SHOTGUN
+    type = WEAPON.SHOTGUN
     name = "Shotgun"
 
     max_primary = 6
@@ -205,11 +206,11 @@ class Shotgun(Weapon):
     reload_time = 0.5
     one_by_one = True
 
-    damage = {HitType.TORSO: 21, HitType.HEAD: 24, HitType.ARMS: 14, HitType.LEGS: 14}
+    damage = {HIT.TORSO: 21, HIT.HEAD: 24, HIT.ARMS: 14, HIT.LEGS: 14}
 
 
 class RPG(Weapon):
-    type = WeaponType.RPG
+    type = WEAPON.RPG
     name = "RPG"
 
     max_primary = 1
@@ -220,7 +221,7 @@ class RPG(Weapon):
     reload_time = 4.0
     one_by_one = False
 
-    damage = {HitType.TORSO: None, HitType.HEAD: None, HitType.ARMS: None, HitType.LEGS: None}
+    damage = {HIT.TORSO: None, HIT.HEAD: None, HIT.ARMS: None, HIT.LEGS: None}
 
 
 WEAPONS = {cls.type: cls for cls in Weapon.__subclasses__()}

@@ -14,7 +14,7 @@ void write_bytes(std::vector<uint8_t> &vec, T item) {
     vec.push_back(static_cast<uint8_t>(item >> 24));
 }
 
-AceMap::AceMap(uint8_t* buf) : eng(std::chrono::system_clock::now().time_since_epoch().count()) {
+AceMap::AceMap(uint8_t *buf) : eng(std::chrono::system_clock::now().time_since_epoch().count()) {
     nodes.reserve(512);
     this->read(buf);
 }

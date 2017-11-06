@@ -46,38 +46,43 @@ cdef class Player:
             self.ply.p.z -= 0.9
         self.ply.crouch = value
 
-    def set_animation(self, jump, crouch, sneak, sprint):
+    def set_animation(self, bint jump, bint crouch, bint sneak, bint sprint):
         self.ply.jump = jump
         self.set_crouch(crouch)
         self.ply.sneak = sneak
         self.ply.sprint = sprint
 
-    def set_weapon(self, is_primary):
+    def set_weapon(self, bint is_primary):
         self.ply.weapon = is_primary
 
-    def set_walk(self, up, down, left, right):
+    def set_walk(self, bint up, bint down, bint left, bint right):
         self.ply.mf = up
         self.ply.mb = down
         self.ply.ml = left
         self.ply.mr = right
 
-    def set_position(self, x, y, z, reset = False):
+    def set_fire(self, bint primary, bint secondary):
+        self.ply.primary_fire = primary
+        self.ply.secondary_fire = secondary
+
+    def set_position(self, double x, double y, double z, bint reset=False):
         self.ply.p.set(x, y, z)
         self.ply.e.set(x, y, z)
         if reset:
             self.ply.v.set(0, 0, 0)
-            self.primary_fire = self.secondary_fire = False
-            self.jump = self.crouch = False
-            self.up = self.down = self.left = self.right = False
+            self.set_walk(False, False, False, False)
+            self.set_animation(False, False, False, False)
+            self.set_fire(False, False)
+            self.set_weapon(True)
 
-    def set_dead(self, dead):
+    def set_dead(self, bint dead):
         self.ply.alive = not dead
 
     @property
     def dead(self):
         return not self.ply.alive
 
-    def set_orientation(self, x: float, y: float, z: float):
+    def set_orientation(self, double x, double y, double z):
         reorient_player(self.ply, x, y, z)
 
     def update(self, double dt, double time):

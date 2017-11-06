@@ -45,7 +45,7 @@ class ServerProtocol(base.BaseProtocol):
         # TODO: configs
         self.mode: GameMode = ctf.CTF(self)
         self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor"]})
-        self.respawn_time = 10
+        self.max_respawn_time = 5
 
     async def run(self):
         self.init_hooks()
@@ -174,8 +174,8 @@ class ServerProtocol(base.BaseProtocol):
                 return ply
 
     def get_respawn_time(self):
-        offset = self.time % self.respawn_time
-        return self.respawn_time - offset
+        offset = int(self.time % self.max_respawn_time)
+        return self.max_respawn_time - offset
 
     def init_hooks(self):
         connection.ServerConnection.on_player_join += self.player_joined

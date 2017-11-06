@@ -117,7 +117,6 @@ class Weapon(Tool):
         return secondary # but we'll relay it to the client anyways
 
     async def reload(self):
-        print("reload")
         if self.reloading:
             return False
         if not self.secondary_ammo or self.primary_ammo >= self.max_primary:
@@ -132,7 +131,6 @@ class Weapon(Tool):
 
     async def on_reload(self):
         await asyncio.sleep(self.reload_time)
-        print("DONE")
         self.reloading = False
         if not self.one_by_one:
             reserve = max(0, self.secondary_ammo - (self.max_primary - self.primary_ammo))

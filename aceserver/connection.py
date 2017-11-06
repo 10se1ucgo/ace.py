@@ -154,13 +154,29 @@ class ServerConnection(base.BaseConnection):
         # chat_message.value = f"Welcome to the server, {self.name}#{self.player_id}!"
         # await self.protocol.broadcast_loader(chat_message)
 
-    async def set_hp(self, hp, reason: DAMAGE=DAMAGE.SELF, source=(0, 0, 0)):
+    async def set_hp(self, hp: int, reason: DAMAGE=DAMAGE.SELF, source: tuple=(0, 0, 0)):
         self.hp = max(0, min(int(hp), 100))
-
         set_hp.hp = self.hp
         set_hp.type = reason
         set_hp.source.xyz = source
         await self.send_loader(set_hp)
+
+    async def kill(self, killer, kill_type: KILL):
+        kill_action.player_id = self.id
+        kill_action.killer_id = (killer or self).id
+        kill_action.kill_type = kill_type
+        kill_action.respawn_time = self.protocol.get_respawn_time()
+        await self.protocol.broadcast_loader(kill_action)
+
+    async def hurt(self, damage: int, cause: KILL=KILL.FALL, damager=None):
+        reason = DAMAGE.SELF if damager is None else DAMAGE.OTHER
+        if isinstance(damager, ServerConnection):
+            pos = damager.position.xyz
+        else:
+            pos = self.position.xyz
+        await self.set_hp(self.hp - damage, reason, pos)
+        if self.hp <= 0:
+            await self.kill(damager, cause)
 
     async def set_tool(self, tool: TOOL):
         self.tool.set_primary(False)
@@ -293,14 +309,27 @@ class ServerConnection(base.BaseConnection):
 
     @on_loader_receive(packets.ExistingPlayer)
     async def recv_existing_player(self, loader: packets.ExistingPlayer):
-        self.name = loader.name
+        self.name = self.validate_name(loader.name)
         if loader.weapon not in weapons.WEAPONS:
             return await self.disconnect()
         self.weapon = weapons.WEAPONS[loader.weapon](self)
+        if loader.team not in self.protocol.teams:
+            return await self.disconnect()
         self.team = self.protocol.teams[loader.team]
         # await self.protocol.player_joined(self)
         await self.on_player_join(self)
         await self.spawn()
+
+    def validate_name(self, name: str):
+        name = name.strip()
+        if name.isspace() or name == "Deuce":
+            name = f"Deuce{self.id}"
+        existing_names = [ply.name.lower() for ply in self.protocol.players.values()]
+        x = 0
+        while name in existing_names:
+            name = f"{name}{x}"
+            x += 1
+        return name
 
     @on_loader_receive(packets.ChatMessage)
     async def recv_chat_message(self, loader: packets.ChatMessage):
@@ -375,6 +404,10 @@ class ServerConnection(base.BaseConnection):
     @property
     def orientation(self) -> math3d.Vector3:
         return self.wo.orientation
+
+    @property
+    def dead(self) -> bool:
+        return not self.wo.alive
 
     # TODO more hooks
 

@@ -44,7 +44,8 @@ class ServerProtocol(base.BaseProtocol):
 
         # TODO: configs
         self.mode: GameMode = ctf.CTF(self)
-        self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "censor"]})
+        self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor"]})
+        self.respawn_time = 10
 
     async def run(self):
         self.init_hooks()
@@ -166,6 +167,15 @@ class ServerProtocol(base.BaseProtocol):
 
         state_data.entities = [ent.to_loader() for ent in self.entities.values()]
         return state_data
+
+    def get_ply_by_name(self, name):
+        for ply in self.players.values():
+            if ply.name == name:
+                return ply
+
+    def get_respawn_time(self):
+        offset = self.time % self.respawn_time
+        return self.respawn_time - offset
 
     def init_hooks(self):
         connection.ServerConnection.on_player_join += self.player_joined

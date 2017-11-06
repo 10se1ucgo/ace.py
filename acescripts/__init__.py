@@ -1,6 +1,7 @@
 import abc
 import importlib
 from typing import Dict
+from collections import OrderedDict
 
 class Script(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -12,7 +13,7 @@ class ScriptLoader:
     def __init__(self, protocol, config: dict):
         self.protocol = protocol
         self.config = config
-        self.scripts: Dict[str, Script] = {}
+        self.scripts: Dict[str, Script] = OrderedDict()
 
     def load_scripts(self, reload=False):
         self.unload_scripts()
@@ -27,6 +28,9 @@ class ScriptLoader:
             self.scripts[script_name] = script
 
     def unload_scripts(self):
-        for script in self.scripts.values():
+        for script in reversed(self.scripts.values()):
             script.deinit()
         self.scripts = {}
+
+    def get(self, name: str):
+        return self.scripts.get(name)

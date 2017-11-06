@@ -1,5 +1,6 @@
 cimport cython
 from libc.stdint cimport *
+from libcpp cimport bool
 
 from .bytes cimport ByteReader, ByteWriter
 from .util cimport read_position, write_position, read_color, write_color
@@ -169,21 +170,21 @@ cdef class InputData(Loader):
         self.sneak  = flags & (1 << 6)
         self.sprint = flags & (1 << 7)
 
-    cpdef write(self, ByteWriter reader):
-        reader.write_uint8(self.id)
-        reader.write_uint8(self.player_id)
+    cpdef write(self, ByteWriter writer):
+        writer.write_uint8(self.id)
+        writer.write_uint8(self.player_id)
 
         cdef uint8_t flags = (
-            self.up     << 0 |
-            self.down   << 1 |
-            self.left   << 2 |
-            self.right  << 3 |
-            self.jump   << 4 |
-            self.crouch << 5 |
-            self.sneak  << 6 |
-            self.sprint << 7
+            <bool>self.up     << 0 |
+            <bool>self.down   << 1 |
+            <bool>self.left   << 2 |
+            <bool>self.right  << 3 |
+            <bool>self.jump   << 4 |
+            <bool>self.crouch << 5 |
+            <bool>self.sneak  << 6 |
+            <bool>self.sprint << 7
         )
-        reader.write_uint8(flags)
+        writer.write_uint8(flags)
 
 
 cdef class WeaponInput(Loader):
@@ -204,7 +205,7 @@ cdef class WeaponInput(Loader):
         reader.write_uint8(self.id)
         reader.write_uint8(self.player_id)
 
-        cdef uint8_t flags = self.primary << 0 | self.secondary << 1
+        cdef uint8_t flags = <bool>self.primary << 0 | <bool>self.secondary << 1
         reader.write_uint8(flags)
 
 
@@ -488,7 +489,7 @@ cdef class PlaySound(Loader):
         writer.write_uint8(self.id)
         writer.write_bytes(self.name.encode("cp437"))
 
-        cdef int sound_flags = self.looping << 0 | self.positioned << 1
+        cdef int sound_flags = <bool>self.looping << 0 | <bool>self.positioned << 1
         writer.write_uint8(sound_flags)
 
         if self.looping:

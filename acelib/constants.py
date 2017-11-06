@@ -78,7 +78,7 @@ class SET(IntEnum):
 class DAMAGE(IntEnum):
     SELF = 0
     OTHER = 1
-    HEAL = 3
+    HEAL = 2
 
 
 class TEAM(IntEnum):

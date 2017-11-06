@@ -17,15 +17,7 @@ class Tool:
 
     def __init__(self, connection: 'connection.ServerConnection'):
         self.connection = connection
-
-        self.primary_timer = self.primary_rate
-        self.secondary_timer = self.secondary_rate
-
-        self.primary = False
-        self.secondary = False
-
-        self.primary_ammo = self.max_primary
-        self.secondary_ammo = self.max_secondary
+        self.reset()
 
     async def update(self, dt: float):
         if self.primary_rate:
@@ -61,6 +53,16 @@ class Tool:
         self.primary_ammo = self.max_primary  # bug? client seems to think it should
         self.secondary_ammo = self.max_secondary
 
+    def reset(self):
+        self.primary_timer = self.primary_rate
+        self.secondary_timer = self.secondary_rate
+
+        self.primary = False
+        self.secondary = False
+
+        self.primary_ammo = self.max_primary
+        self.secondary_ammo = self.max_secondary
+
 
 class Block(Tool):
     max_primary = 50
@@ -79,8 +81,10 @@ class Block(Tool):
     def destroy(self):
         self.primary_ammo = max(0, min(self.primary_ammo + 1, self.max_primary))
 
-    def restock(self):
-        self.primary_ammo = self.max_primary
+    def reset(self):
+        super().reset()
+        self.color = packets.Color()
+        self.color.rgb = (112, 112, 112)
 
     async def set_color(self, r, g, b, *, sender_is_self=False):
         self.color.rgb = r, g, b

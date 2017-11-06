@@ -27,6 +27,10 @@ class EssentialsScript(Script):
         await connection.set_hp(hp)
 
     @commands.command()
+    async def hurt(self, connection: ServerConnection, hp: int):
+        await connection.hurt(hp)
+
+    @commands.command()
     async def tp(self, connection: ServerConnection, other: ServerConnection):
         await connection.set_position(*other.position.xyz)
 

@@ -62,20 +62,20 @@ cdef class Player:
         self.ply.mr = right
 
     def set_position(self, x, y, z, reset = False):
-        # self.position.set(x, y, z)
-        # print(self.ply.p.x)
-        self.ply.p.x = self.ply.e.x = x
-        self.ply.p.y = self.ply.e.y = y
-        self.ply.p.z = self.ply.e.z = z
+        self.ply.p.set(x, y, z)
+        self.ply.e.set(x, y, z)
         if reset:
-            self.ply.v.x = 0
-            self.ply.v.y = 0
-            self.ply.v.z = 0
-        # if reset:
-        #     self.velocity.set(0.0, 0.0, 0.0)
-        #     self.primary_fire = self.secondary_fire = False
-        #     self.jump = self.crouch = False
-        #     self.up = self.down = self.left = self.right = False
+            self.ply.v.set(0, 0, 0)
+            self.primary_fire = self.secondary_fire = False
+            self.jump = self.crouch = False
+            self.up = self.down = self.left = self.right = False
+
+    def set_dead(self, dead):
+        self.ply.alive = not dead
+
+    @property
+    def dead(self):
+        return not self.ply.alive
 
     def set_orientation(self, x: float, y: float, z: float):
         reorient_player(self.ply, x, y, z)

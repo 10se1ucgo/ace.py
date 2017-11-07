@@ -2,6 +2,7 @@ import inspect
 import traceback
 import ipaddress
 import struct
+import weakref
 from typing import Union, Tuple
 from urllib import request, parse
 
@@ -32,16 +33,27 @@ class Event:
     def __iadd__(self, other):
         if not callable(other):
             raise TypeError("Event handler must be callable.")
-        self._funcs.append(other)
+        if inspect.ismethod(other):
+            self._funcs.append(weakref.WeakMethod(other))
+        else:
+            self._funcs.append(weakref.ref(other))
         return self
 
     def __isub__(self, other):
-        self._funcs.remove(other)
+        # is this ok
+        for ref in self._funcs:
+            obj = ref()
+            if obj is other or obj is None:
+                self._funcs.remove(ref)
         return self
 
     def __call__(self, *args, **kwargs):
-        for func in self._funcs:
+        for ref in self._funcs:
             try:
+                func = ref()
+                if func is None:
+                    self._funcs.remove(ref)
+                    continue
                 r = func(*args, **kwargs)
             except Exception:
                 print(f"Ignoring exception in event hook {func}")
@@ -57,8 +69,12 @@ class AsyncEvent(Event):
         return super().__iadd__(other)
 
     async def __call__(self, *args, **kwargs):
-        for func in self._funcs:
+        for ref in self._funcs:
             try:
+                func = ref()
+                if func is None:
+                    self._funcs.remove(ref)
+                    continue
                 r = await func(*args, **kwargs)
             except Exception:
                 print(f"Ignoring exception in event hook {func}")

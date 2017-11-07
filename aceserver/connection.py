@@ -1,6 +1,8 @@
 import asyncio
 import io
+import sys
 import textwrap
+import traceback
 import zlib
 from collections import defaultdict
 from typing import *
@@ -49,16 +51,21 @@ class ServerConnection(base.BaseConnection):
         if data != PROTOCOL_VERSION:
             return await self.disconnect(DISCONNECT.WRONG_VERSION)
 
-        asyncio.ensure_future(self.connection_ack())
+        self.protocol.loop.create_task(self.connection_ack())
 
     async def on_disconnect(self):
         if self.id is not None:
             await self.on_player_leave(self)
 
     async def on_receive(self, packet: enet.Packet):
-        reader: ByteReader = ByteReader(packet.data, packet.dataLength)
-        packet_id: int = reader.read_uint8()
-        loader: packets.Loader = packets.CLIENT_LOADERS[packet_id](reader)
+        try:
+            reader: ByteReader = ByteReader(packet.data, packet.dataLength)
+            packet_id: int = reader.read_uint8()
+            loader: packets.Loader = packets.CLIENT_LOADERS[packet_id](reader)
+        except:
+            print(f"Malformed packet from player #{self.id}, disconnecting.", file=sys.stderr)
+            traceback.print_exc()
+            return await self.disconnect()
         await self.received_loader(loader)
 
     async def send_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE):
@@ -267,18 +274,11 @@ class ServerConnection(base.BaseConnection):
         position_data.data.xyz = x, y, z
         await self.send_loader(position_data)
 
-    async def restock(self):
-        await self.set_hp(100)
-        # self.grenades.restock()
+    async def restock(self, heal=True):
+        if heal:
+            await self.set_hp(100)
         [tool.restock() for tool in self.tools]
         await self.send_loader(restock)
-        # pass
-        # self.hp = 100
-        # self.grenades = 3
-        # self.blocks = 50
-        # self.weapon_object.restock()
-        # if not local:
-        #     self.send_contained(restock)
 
     # Chat Message Related
     @util.static_vars(wrapper=textwrap.TextWrapper(width=MAX_CHAT_SIZE))
@@ -416,6 +416,23 @@ class ServerConnection(base.BaseConnection):
             return
         if self.tool.on_primary():
             print(loader.value, loader.position.xyz, loader.velocity.xyz)
+
+    @on_loader_receive(packets.HitPacket)
+    async def recv_oriented_item(self, loader: packets.HitPacket):
+        if self.dead:
+            return
+        if self.tool_type != TOOL.WEAPON or not self.tool.primary:
+            return
+
+        # TODO our own raycasting and hack detection etc.
+        damage = self.weapon.get_damage(loader.value)
+        if damage is None:
+            return
+        other = self.protocol.players.get(loader.player_id)
+        if other is None:
+            return
+        await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
+
 
     async def update(self, dt):
         if self.dead: return

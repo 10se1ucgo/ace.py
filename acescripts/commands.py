@@ -57,8 +57,7 @@ class Command:
                 if param.default is param.empty:
                     raise NotEnoughArguments(f"Not enough commands supplied to {self.name}") from None
                 arg = param.default
-
-            if not isinstance(arg, param_type):
+            else:
                 try:
                     if converter:
                         arg = converter(connection, arg)

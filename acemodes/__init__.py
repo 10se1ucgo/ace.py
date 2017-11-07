@@ -1,6 +1,16 @@
 from typing import Tuple
 
-from aceserver import protocol, connection
+from aceserver import protocol, connection, types
+
+
+async def _on_healthcrate(crate: types.HealthCrate, connection: 'connection.ServerConnection'):
+    await connection.set_hp(100)
+    await crate.destroy()
+
+
+async def _on_ammocrate(crate: types.AmmoCrate, connection: 'connection.ServerConnection'):
+    await connection.restock(heal=False)
+    await crate.destroy()
 
 
 class GameMode:
@@ -11,6 +21,11 @@ class GameMode:
         self.protocol = protocol
 
     async def init(self):
+        # TODO should this be in the base GameMode or should this just be default behaviour within the Health/AmmoCrate class?
+        types.HealthCrate.on_collide += _on_healthcrate
+        types.AmmoCrate.on_collide += _on_ammocrate
+
+    async def deinit(self):
         pass
 
     async def update(self, dt: float):

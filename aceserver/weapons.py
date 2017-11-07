@@ -17,20 +17,25 @@ class Tool:
 
     def __init__(self, connection: 'connection.ServerConnection'):
         self.connection = connection
-        self.reset()
+        self.next_primary = connection.protocol.time
+        self.next_secondary = connection.protocol.time
+
+        self.primary = False
+        self.secondary = False
+
+        self.primary_ammo = self.max_primary
+        self.secondary_ammo = self.max_secondary
 
     async def update(self, dt: float):
         if self.primary_rate:
-            self.primary_timer = min(self.primary_rate, self.primary_timer + dt)
-            if self.primary_ammo > 0 and self.primary and self.primary_timer >= self.primary_rate:
-                self.primary_timer = 0
-                await self.on_primary()
+            if self.primary_ammo > 0 and self.primary and self.connection.protocol.time >= self.next_primary:
+                self.next_primary = self.connection.protocol.time + self.primary_rate
+                self.on_primary()
 
         if self.secondary_rate:
-            self.secondary_timer = min(self.secondary_rate, self.secondary_timer + dt)
-            if self.secondary_ammo > 0 and self.secondary and self.secondary_timer >= self.secondary_rate:
-                self.secondary_timer = 0
-                await self.on_secondary()
+            if self.secondary_ammo > 0 and self.secondary and self.connection.protocol.time >= self.next_secondary:
+                self.next_secondary = self.connection.protocol.time + self.primary_rate
+                self.on_secondary()
 
     def set_primary(self, primary: bool):
         self.primary = primary
@@ -40,10 +45,10 @@ class Tool:
         self.secondary = secondary
         return secondary
 
-    async def on_primary(self, *args, **kwargs):
+    def on_primary(self, *args, **kwargs):
         return True
 
-    async def on_secondary(self, *args, **kwargs):
+    def on_secondary(self, *args, **kwargs):
         return True
 
     async def reload(self, *args, **kwargs):
@@ -54,14 +59,7 @@ class Tool:
         self.secondary_ammo = self.max_secondary
 
     def reset(self):
-        self.primary_timer = self.primary_rate
-        self.secondary_timer = self.secondary_rate
-
-        self.primary = False
-        self.secondary = False
-
-        self.primary_ammo = self.max_primary
-        self.secondary_ammo = self.max_secondary
+        pass
 
 
 class Block(Tool):
@@ -147,16 +145,22 @@ class Weapon(Tool):
             await self.send_reload()
             await self.reload()
 
-    async def on_primary(self):
+    def on_primary(self):
         if self.primary_ammo <= 0:
             return False
         self.primary_ammo -= 1
+        print("SHOOT", self.primary_ammo)
         return True
 
-    async def on_secondary(self):
+    def on_secondary(self):
         pass
 
     def get_damage(self, value):
+        if not self.primary or self.reloading:
+            return None
+        clip_tolerance = int(self.max_primary * 0.3)
+        if self.primary_ammo + clip_tolerance <= 0:
+            return None
         return self.damage[value]
 
     async def send_reload(self):
@@ -188,7 +192,7 @@ class SMG(Weapon):
     max_primary = 30
     max_secondary = 120
 
-    primary_rate = 0.1
+    primary_rate = 0.11
 
     reload_time = 2.5
     one_by_one = False

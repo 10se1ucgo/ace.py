@@ -83,18 +83,17 @@ class Team(object):
 class Entity:
     type = None
     mountable = False
+    on_collide = util.AsyncEvent()
 
     def __init__(self, entity_id: int, protocol: 'protocol.ServerProtocol', **kwargs):
         self.id = entity_id
         self.protocol = protocol
 
-        self.position = math3d.Vector3(*kwargs.get("position"))
+        self.position = math3d.Vector3(*kwargs.get("position", (0, 0, 0)))
         self.team: Team = kwargs.get("team")
         self.carrier: connection.ServerConnection = kwargs.get("carrier")
 
         self.destroyed = False
-
-        self.on_collide = util.AsyncEvent()
 
     async def update(self, dt):
         if self.destroyed:
@@ -115,6 +114,7 @@ class Entity:
             return
         self.team = team
         state = self.team.id if self.team else TEAM.NEUTRAL
+        change_entity.entity_id = self.id
         change_entity.type = SET.STATE
         change_entity.state = state
         self.protocol.broadcast_loader(change_entity)
@@ -123,6 +123,7 @@ class Entity:
         if self.destroyed:
             return
         self.position.xyz = x, y, z
+        change_entity.entity_id = self.id
         change_entity.type = SET.POSITION
         change_entity.position.xyz = self.position.xyz
         await self.protocol.broadcast_loader(change_entity)
@@ -132,6 +133,7 @@ class Entity:
             return
         self.carrier = carrier
         player = self.carrier.id if self.carrier else -1
+        change_entity.entity_id = self.id
         change_entity.type = SET.CARRIER
         change_entity.carrier = player
         await self.protocol.broadcast_loader(change_entity)
@@ -162,15 +164,24 @@ class Entity:
 
 class Flag(Entity):
     type = ENTITY.FLAG
+    on_collide = util.AsyncEvent()
+
+
+class Helicopter(Entity):
+    type = ENTITY.HELICOPTER
+    on_collide = util.AsyncEvent()
 
 
 class AmmoCrate(Entity):
     type = ENTITY.AMMO_CRATE
+    on_collide = util.AsyncEvent()
 
 
 class HealthCrate(Entity):
     type = ENTITY.HEALTH_CRATE
+    on_collide = util.AsyncEvent()
 
 
-class Base(Entity):
-    type = ENTITY.BASE
+class CommandPost(Entity):
+    type = ENTITY.COMMAND_POST
+    on_collide = util.AsyncEvent()

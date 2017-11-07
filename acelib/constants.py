@@ -45,7 +45,7 @@ class SCORE(IntEnum):
 
 class ENTITY(IntEnum):
     FLAG = 0
-    BASE = 1
+    COMMAND_POST = 1
     HELICOPTER = 2
     AMMO_CRATE = 3
     HEALTH_CRATE = 4

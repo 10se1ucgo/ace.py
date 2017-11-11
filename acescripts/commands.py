@@ -76,9 +76,7 @@ class CommandsScript(Script):
     COMMAND_PREFIX = "/"
 
     def __init__(self, protocol: ServerProtocol, cfg: dict):
-        self.protocol = protocol
-        self.cfg = cfg
-
+        super().__init__(protocol, cfg)
         self.commands: Dict[str, Command] = {}
         self.command_prefix = cfg.get("command_prefix", self.COMMAND_PREFIX)
 
@@ -114,9 +112,6 @@ class CommandsScript(Script):
             print(f"Ignoring error in command {command.name}", file=sys.stderr)
             traceback.print_exc()
         return False
-
-    def deinit(self):
-        ServerConnection.try_chat_message -= self.try_chat_message
 
 
 _converters: Dict[str, Callable] = {}

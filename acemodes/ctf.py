@@ -38,7 +38,6 @@ class CTF(GameMode):
         [await cp.destroy() for cp in self.cps.values()]
 
     async def on_intel_collide(self, intel: types.Flag, player: 'connection.ServerConnection'):
-        # print(intel, player)
         if intel.team == player.team:
             return
 
@@ -47,7 +46,6 @@ class CTF(GameMode):
         await self.pickup_sound.play()
 
     async def on_cp_collide(self, base: types.CommandPost, player: 'connection.ServerConnection'):
-        # print(base, player)
         if base.team != player.team:
             return
 
@@ -65,11 +63,6 @@ class CTF(GameMode):
         await player.team.set_score()
         await self.protocol.broadcast_hud_message(f"{player} captured the {intel.team} Intel")
         await self.capture_sound.play()
-
-    def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[int, int, int]:
-        pos: Vector3 = self.team1_intel.position - Vector3(3, 3, 0)
-        pos.z = self.protocol.map.get_z(pos.x, pos.y) - 2
-        return pos.xyz
 
     async def reset_intel(self, intel):
         await intel.set_carrier(None)

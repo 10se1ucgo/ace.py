@@ -9,7 +9,7 @@ import acescripts
 from acelib import packets, vxl, world
 from acelib.bytes import ByteWriter
 from acelib.constants import *
-from acemodes import GameMode, ctf
+from acemodes import GameMode, ctf, de
 from aceserver import base, util, connection, types
 from aceserver.loaders import *
 
@@ -43,8 +43,8 @@ class ServerProtocol(base.BaseProtocol):
         self.world_objects = []
 
         # TODO: configs
-        self.mode: GameMode = ctf.CTF(self)
-        self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor"]})
+        self.mode: GameMode = de.Defusal(self)
+        self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor", "greeting"]})
         self.max_respawn_time = 5
 
     async def run(self):

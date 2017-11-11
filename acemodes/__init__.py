@@ -9,7 +9,8 @@ async def _on_healthcrate(crate: types.HealthCrate, connection: 'connection.Serv
 
 
 async def _on_ammocrate(crate: types.AmmoCrate, connection: 'connection.ServerConnection'):
-    await connection.restock(heal=False)
+    connection.weapon.restock()
+    await connection.weapon.send_ammo()
     await crate.destroy()
 
 
@@ -32,7 +33,8 @@ class GameMode:
         pass
 
     def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[int, int, int]:
-        return self.get_random_pos(player.team)
+        x, y ,z = self.get_random_pos(player.team)
+        return x, y, z - 2
 
     def get_random_pos(self, team):
         offset = team.id * 384

@@ -68,7 +68,7 @@ class ServerConnection(base.BaseConnection):
             return await self.disconnect()
         await self.received_loader(loader)
 
-    async def send_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE):
+    def send_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE):
         writer: ByteWriter = loader.generate()
         packet: enet.Packet = enet.Packet(bytes(writer), flags)
         # does this even DO anything?? enet just queues the packet for the next host_service call...
@@ -109,6 +109,7 @@ class ServerConnection(base.BaseConnection):
         await self.send_map()
         await self.send_state()
         await self.send_players()
+        await self.on_player_connect(self)
 
     async def send_packs(self):
         for data, length, crc32 in self.protocol.packs:
@@ -148,20 +149,25 @@ class ServerConnection(base.BaseConnection):
         for conn in self.protocol.players.values():
             await self.send_loader(conn.to_existing_player())
 
-    async def spawn(self, x=0, y=0, z=0):
-        create_player.position.xyz = self.protocol.mode.get_spawn_point(self) or (x, y, z)
+    async def spawn(self, x: float=None, y: float=None, z: float=None):
+        pos = self.protocol.mode.get_spawn_point(self) if x is None or y is None or z is None else (x, y, z)
+
+        hook = await self.try_player_spawn(self, x, y, z)
+        if hook is False:
+            return
+        pos = pos if hook is None else hook
+
+        create_player.position.xyz = pos
         create_player.weapon = self.weapon.type
         create_player.player_id = self.id
         create_player.name = self.name
         create_player.team = self.team.id
-        self.dead = False
-        self.wo.set_position(*create_player.position.xyz, reset=True)
         await self.protocol.broadcast_loader(create_player)
+
+        self.wo.set_dead(False)
+        self.wo.set_position(*pos, reset=True)
         await self.restock()
-        # chat_message.player_id = 255
-        # chat_message.chat_type = constants.CHAT_BIG
-        # chat_message.value = f"Welcome to the server, {self.name}#{self.player_id}!"
-        # await self.protocol.broadcast_loader(chat_message)
+        await self.on_player_spawn(self, x, y, z)
 
     async def set_hp(self, hp: int, reason: DAMAGE=None, source: tuple=(0, 0, 0)):
         if reason is None:
@@ -175,10 +181,10 @@ class ServerConnection(base.BaseConnection):
         set_hp.source.xyz = source
         await self.send_loader(set_hp)
 
-    async def kill(self, killer, kill_type: KILL):
+    async def kill(self, kill_type: KILL=KILL.FALL, killer=None):
         if self.dead or self.store.get("respawn_task") is not None: return
 
-        self.dead = True
+        self.wo.set_dead(True)
 
         respawn_time = self.protocol.get_respawn_time()
         kill_action.player_id = self.id
@@ -195,7 +201,6 @@ class ServerConnection(base.BaseConnection):
 
     async def hurt(self, damage: int, cause: KILL=KILL.FALL, damager=None):
         reason = DAMAGE.SELF if damager is None else DAMAGE.OTHER
-        damager = damager or self
         if isinstance(damager, ServerConnection):
             pos = damager.position.xyz
         else: # elif isinstance(damager, Grenade), etc..
@@ -207,7 +212,7 @@ class ServerConnection(base.BaseConnection):
         damage = damage if hook is None else hook
         await self.set_hp(self.hp - damage, reason, pos)
         if self.hp <= 0:
-            await self.kill(damager or self, cause)
+            await self.kill(cause, damager)
         else:
             await self.on_player_hurt(self, damage, damager, reason)
 
@@ -270,7 +275,8 @@ class ServerConnection(base.BaseConnection):
         else:
             if z is None:
                 z = self.protocol.map.get_z(x, y) - 2
-            self.position.xyz = x, y, z
+        print(f"Setting pos to {x}, {y}, {z}")
+        self.wo.set_position(x, y, z, True)
         position_data.data.xyz = x, y, z
         await self.send_loader(position_data)
 
@@ -279,6 +285,10 @@ class ServerConnection(base.BaseConnection):
             await self.set_hp(100)
         [tool.restock() for tool in self.tools]
         await self.send_loader(restock)
+
+    async def play_sound(self, sound: types.Sound):
+        pkt = sound.to_play_sound()
+        await self.send_loader(pkt)
 
     # Chat Message Related
     @util.static_vars(wrapper=textwrap.TextWrapper(width=MAX_CHAT_SIZE))
@@ -341,12 +351,14 @@ class ServerConnection(base.BaseConnection):
         name = name.strip()
         if name.isspace() or name == "Deuce":
             name = f"Deuce{self.id}"
+
+        new_name = name
         existing_names = [ply.name.lower() for ply in self.protocol.players.values()]
         x = 0
-        while name in existing_names:
-            name = f"{name}{x}"
+        while new_name in existing_names:
+            new_name = f"{name}{x}"
             x += 1
-        return name
+        return new_name
 
     @on_loader_receive(packets.ChatMessage)
     async def recv_chat_message(self, loader: packets.ChatMessage):
@@ -433,14 +445,13 @@ class ServerConnection(base.BaseConnection):
             return
         await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
 
-
     async def update(self, dt):
         if self.dead: return
 
         fall_dmg: int = self.wo.update(dt, self.protocol.time)
         if fall_dmg > 0:
             await self.hurt(fall_dmg)
-        await asyncio.wait(tuple(tool.update(dt) for tool in self.tools))
+        await self.tool.update(dt)
 
     def to_existing_player(self) -> packets.ExistingPlayer:
         existing_player.name = self.name
@@ -472,12 +483,10 @@ class ServerConnection(base.BaseConnection):
     def dead(self) -> bool:
         return self.wo.dead
 
-    @dead.setter
-    def dead(self, value: bool):
-        self.wo.set_dead(value)
-
 
     # TODO more hooks
+    on_player_connect = util.AsyncEvent()
+
 
     # Called after the player joins the game
     # (self) -> None

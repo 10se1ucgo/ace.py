@@ -15,12 +15,7 @@ class Sound:
         self.position = position
 
     async def play(self, predicate=None):
-        play_sound.name = self.name
-        play_sound.looping = self.id is not None
-        play_sound.loop_id = self.id or 0
-        play_sound.positioned = self.position is not None
-        play_sound.position.xyz = self.position or (0, 0, 0)
-        await self.protocol.broadcast_loader(play_sound, predicate=predicate)
+        await self.protocol.broadcast_loader(self.to_play_sound(), predicate=predicate)
 
     async def stop(self, predicate=None):
         if self.id is None:
@@ -32,6 +27,13 @@ class Sound:
         await self.stop()
         self.protocol.destroy_sound(self)
 
+    def to_play_sound(self):
+        play_sound.name = self.name
+        play_sound.looping = self.id is not None
+        play_sound.loop_id = self.id or 0
+        play_sound.positioned = self.position is not None
+        play_sound.position.xyz = self.position or (0, 0, 0)
+        return play_sound
 
 class Team(object):
     def __init__(self, team_id: TEAM, name: str, color: tuple, spectator: bool, protocol: 'protocol.ServerProtocol'):
@@ -99,7 +101,7 @@ class Entity:
         if self.destroyed:
             return
 
-        z = self.protocol.map.get_z(self.position.x, self.position.y)
+        z = self.protocol.map.get_z(self.position.x, self.position.y, self.position.z - 1)
         if z != self.position.z:
             await self.set_position(self.position.x, self.position.y, z)
 
@@ -107,7 +109,7 @@ class Entity:
             for conn in self.protocol.players.values():
                 dist = self.position.sq_distance(conn.position)
                 if dist <= 3 ** 2:
-                    await self.on_collide(self, conn)
+                    self.protocol.loop.create_task(self.on_collide(self, conn))
 
     async def set_team(self, team):
         if self.destroyed:
@@ -117,7 +119,7 @@ class Entity:
         change_entity.entity_id = self.id
         change_entity.type = SET.STATE
         change_entity.state = state
-        self.protocol.broadcast_loader(change_entity)
+        await self.protocol.broadcast_loader(change_entity)
 
     async def set_position(self, x, y, z):
         if self.destroyed:

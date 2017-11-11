@@ -138,11 +138,11 @@ class Weapon(Tool):
             reserve = max(0, self.secondary_ammo - (self.max_primary - self.primary_ammo))
             self.primary_ammo += self.secondary_ammo - reserve
             self.secondary_ammo = reserve
-            await self.send_reload()
+            await self.send_ammo()
         else:
             self.primary_ammo += 1
             self.secondary_ammo -= 1
-            await self.send_reload()
+            await self.send_ammo()
             await self.reload()
 
     def on_primary(self):
@@ -163,7 +163,7 @@ class Weapon(Tool):
             return None
         return self.damage[value]
 
-    async def send_reload(self):
+    async def send_ammo(self):
         loaders.weapon_reload.player_id = self.connection.id
         loaders.weapon_reload.clip_ammo = self.primary_ammo
         loaders.weapon_reload.reserve_ammo = self.secondary_ammo

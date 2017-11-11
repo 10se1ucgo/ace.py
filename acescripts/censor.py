@@ -10,6 +10,7 @@ from acescripts import Script
 
 class CensorScript(Script):
     def __init__(self, protocol: ServerProtocol, cfg: dict):
+        super().__init__(protocol, cfg)
         self.bad_words = ["fuck", "piss", "shit", "cunt"] + cfg.get("bad_words", [])
         self.really_bad_words = ["faggot"] + cfg.get("really_bad_words", [])
         # TODO find a cleaner way to have this
@@ -25,9 +26,6 @@ class CensorScript(Script):
             message = message.replace(bad_word, "*" * len(bad_word))
         # returning message cancels all further hooks, but replaces the message with our own version.
         return message
-
-    def deinit(self):
-        ServerConnection.try_chat_message -= self.censor
 
 
 def init(protocol: ServerProtocol, cfg: dict):

@@ -18,7 +18,7 @@ import acemodes
 
 class EssentialsScript(Script):
     def __init__(self, protocol: ServerProtocol, cfg: dict):
-        self.protocol = protocol
+        super().__init__(protocol, cfg)
         # TODO is this the best way to add commands?
         # Perhaps the commands script should check each script for commands by itself.
         self.protocol.scripts.get("commands").add_commands(self)

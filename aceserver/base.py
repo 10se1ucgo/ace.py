@@ -37,6 +37,7 @@ class BaseProtocol:
 
         # start = self.loop.time()
         last: float = self.loop.time()
+        self.loop.create_task(self.net_update())
         while self.loop.is_running():
             now = self.loop.time()
             dt = now - last
@@ -55,34 +56,35 @@ class BaseProtocol:
         print("Flushed host")
 
     async def update(self, dt):
-        await self.net_update(dt)
+        pass # await self.net_update(dt)
 
     # def net_loop(self):
     #     while True:
     #         self.net()
 
-    async def net_update(self, dt):
-        try:
-            if self.host is None:
-                return
-            event = await self.loop.run_in_executor(None, self.host.service, 0)
-            event_type = event.type
-            if not event or event_type == enet.EVENT_TYPE_NONE:
-                return
+    async def net_update(self):
+        while True:
+            try:
+                if self.host is None:
+                    return
+                event = await self.loop.run_in_executor(None, self.host.service, 0)
+                event_type = event.type
+                if not event or event_type == enet.EVENT_TYPE_NONE:
+                    continue
 
-            peer = event.peer
-            future = None
-            if event_type == enet.EVENT_TYPE_CONNECT:
-                future = asyncio.ensure_future(self.on_connect(peer, event.data), loop=self.loop)
-            elif event_type == enet.EVENT_TYPE_DISCONNECT:
-                future = asyncio.ensure_future(self.on_disconnect(peer), loop=self.loop)
-            elif event_type == enet.EVENT_TYPE_RECEIVE:
-                future = asyncio.ensure_future(self.on_receive(peer, event.packet), loop=self.loop)
-            if future:
-                future.add_done_callback(net_finish)
-        except:
-            print("Ignoring exception in net_loop(): ")
-            traceback.print_exc()
+                peer = event.peer
+                future = None
+                if event_type == enet.EVENT_TYPE_CONNECT:
+                    future = asyncio.ensure_future(self.on_connect(peer, event.data), loop=self.loop)
+                elif event_type == enet.EVENT_TYPE_DISCONNECT:
+                    future = asyncio.ensure_future(self.on_disconnect(peer), loop=self.loop)
+                elif event_type == enet.EVENT_TYPE_RECEIVE:
+                    future = asyncio.ensure_future(self.on_receive(peer, event.packet), loop=self.loop)
+                if future:
+                    future.add_done_callback(net_finish)
+            except:
+                print("Ignoring exception in net_loop(): ")
+                traceback.print_exc()
 
     async def on_connect(self, peer: enet.Peer, data: int):
         connection: typing.Optional[BaseConnection] = self.connections.get(peer)

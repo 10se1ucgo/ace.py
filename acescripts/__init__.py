@@ -1,12 +1,15 @@
-import abc
 import importlib
 from typing import Dict
 from collections import OrderedDict
 
-class Script(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+
+class Script:
+    def __init__(self, protocol, cfg):
+        self.protocol = protocol
+        self.cfg = cfg
+
     def deinit(self):
-        return
+        pass
 
 
 class ScriptLoader:

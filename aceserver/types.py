@@ -1,9 +1,9 @@
 from typing import Generator
 
-from acelib import math3d, packets
-from acelib.constants import TEAM, SET, ENTITY, SCORE
+from acelib import math3d, packets, world
+from acelib.constants import TEAM, SET, ENTITY, SCORE, KILL, ACTION
 from aceserver import protocol, connection, util, loaders
-from aceserver.loaders import play_sound, stop_sound, change_entity
+from aceserver.loaders import play_sound, stop_sound, change_entity, grenade_packet
 
 
 class Sound:
@@ -187,3 +187,47 @@ class HealthCrate(Entity):
 class CommandPost(Entity):
     type = ENTITY.COMMAND_POST
     on_collide = util.AsyncEvent()
+
+
+class Grenade:
+    on_throw = util.AsyncEvent()
+    on_collide = util.AsyncEvent()
+    on_explode = util.AsyncEvent()
+
+    def __init__(self, protocol: 'protocol.ServerProtocol', thrower: 'connection.ServerConnection', fuse, position, velocity):
+        self.protocol = protocol
+        self.thrower = thrower
+        self.wo = world.Grenade(protocol.map, *position, *velocity)
+        self.explode_time = self.protocol.time + fuse
+        self.protocol.loop.create_task(self.on_throw(self))
+
+    async def update(self, dt):
+        bounced = self.wo.update(dt, self.protocol.time)
+        if bounced:
+            self.protocol.loop.create_task(self.on_collide(self))
+        if self.protocol.time >= self.explode_time:
+            await self.explode()
+            self.protocol.destroy_object(self)
+
+    async def explode(self):
+        x, y, z = self.wo.position.xyz
+        await self.thrower.destroy_block(int(x), int(y), int(z), ACTION.GRENADE)
+        for player in self.protocol.players.values():
+            dist = player.position.sq_distance(self.wo.position)
+            if dist < 16 ** 2 and self.hit_test(player):
+                if dist == 0:
+                    damage = 100
+                else:
+                    damage = 4096 / dist
+                await player.hurt(damage, KILL.GRENADE, self.thrower)
+        self.protocol.loop.create_task(self.on_explode(self))
+
+    async def broadcast_grenade(self, predicate=None):
+        grenade_packet.player_id = self.thrower.id
+        grenade_packet.value = self.explode_time - self.protocol.time
+        grenade_packet.position.xyz = self.wo.position.xyz
+        grenade_packet.velocity.xyz = self.wo.velocity.xyz
+        await self.protocol.broadcast_loader(grenade_packet, predicate=predicate)
+
+    def hit_test(self, player: 'connection.ServerConnection'):
+        return not world.cast_ray(self.protocol.map, player.position, self.wo.position, isdirection=False)

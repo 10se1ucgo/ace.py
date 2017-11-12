@@ -42,7 +42,7 @@ class ServerConnection(base.BaseConnection):
 
         self.kills: int = 0
 
-        self.wo: world.Player = self.protocol.create_world_object(world.Player)
+        self.wo: world.Player = world.Player(self.protocol.map)
         self.store = {}
 
         self._listeners: Dict[int, List[asyncio.Future]] = defaultdict(list)
@@ -229,6 +229,11 @@ class ServerConnection(base.BaseConnection):
         to_destroy = [(x, y, z)]
         if destroy_type == ACTION.SPADE and self.tool_type == TOOL.SPADE:
             to_destroy.extend(((x, y, z - 1), (x, y, z + 1)))
+        elif destroy_type == ACTION.GRENADE:
+            for ax in range(x - 1, x + 2):
+                for ay in range(y - 1, y + 2):
+                    for az in range(z - 1, z + 2):
+                        to_destroy.append((ax, ay, az))
         elif destroy_type == ACTION.DESTROY:
             self.block.destroy()
 
@@ -384,6 +389,9 @@ class ServerConnection(base.BaseConnection):
     async def recv_block_action(self, loader: packets.BlockAction):
         if self.dead: return
 
+        if loader.value == ACTION.GRENADE:
+            return  # client shouldnt send this
+
         if loader.value == ACTION.BUILD:
             await self.build_block(loader.x, loader.y, loader.z)
         else:
@@ -424,10 +432,19 @@ class ServerConnection(base.BaseConnection):
         if self.dead:
             return
 
-        if self.tool_type not in (TOOL.GRENADE, TOOL.RPG):
-            return
-        if self.tool.on_primary():
-            print(loader.value, loader.position.xyz, loader.velocity.xyz)
+        if loader.tool == TOOL.GRENADE:
+            if self.tool_type != TOOL.GRENADE:
+                return
+            if self.grenade.on_primary():
+                grenade: types.Grenade = \
+                    self.protocol.create_object(types.Grenade, self, loader.value, loader.position.xyz, loader.velocity.xyz)
+                await grenade.broadcast_grenade(lambda conn: conn != self)
+        elif loader.tool == TOOL.RPG:
+            # not implemented
+            if self.tool_type != TOOL.WEAPON or self.tool.type != WEAPON.RPG:
+                return
+            if self.weapon.on_primary():
+                print("RPG")
 
     @on_loader_receive(packets.HitPacket)
     async def recv_oriented_item(self, loader: packets.HitPacket):

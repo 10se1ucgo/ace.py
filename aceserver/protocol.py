@@ -40,7 +40,7 @@ class ServerProtocol(base.BaseProtocol):
         self.players: Dict[int, connection.ServerConnection] = {}
         self.entities: Dict[int, types.Entity] = {}
         self.sounds: Dict[int, types.Sound] = {}
-        self.world_objects = []
+        self.objects: List[Any] = []
 
         # TODO: configs
         self.mode: GameMode = de.Defusal(self)
@@ -60,9 +60,10 @@ class ServerProtocol(base.BaseProtocol):
 
     async def update(self, dt):
         await super().update(dt)
-        ent_updates = [ent.update(dt) for ent in self.entities.values()]
-        ply_updates = [ply.update(dt) for ply in self.players.values()]
-        await asyncio.wait(ent_updates + ply_updates + [self.mode.update(dt)])
+        ent_updates = {ent.update(dt) for ent in self.entities.values()}
+        ply_updates = {ply.update(dt) for ply in self.players.values()}
+        obj_updates = {obj.update(dt) for obj in self.objects}
+        await asyncio.wait(ent_updates | ply_updates | obj_updates | {self.mode.update(dt)})
         await self.world_update()
 
     async def world_update(self):
@@ -84,25 +85,13 @@ class ServerProtocol(base.BaseProtocol):
             if predicate(conn):
                 await conn.send_loader(loader, flags)
 
-    async def player_joined(self, conn: 'connection.ServerConnection'):
-        print(f"player join {conn.id}")
-        self.players[conn.id] = conn
-
-    async def player_left(self, conn: 'connection.ServerConnection'):
-        print(f"player leave {conn.id}")
-        ply = self.players.pop(conn.id, None)
-        self.player_ids.push(conn.id)
-        if ply:  # PlayerLeft will crash the clients if the left player didn't actually join the game.
-            player_left.player_id = conn.id
-            await self.broadcast_loader(player_left)
-
-    def create_world_object(self, obj_type, **kwargs):
-        obj = obj_type(self.map)
-        self.world_objects.append(obj)
+    def create_object(self, obj_type, *args, **kwargs):
+        obj = obj_type(self, *args, **kwargs)
+        self.objects.append(obj)
         return obj
 
-    def destroy_world_object(self, obj: world.WorldObject):
-        self.world_objects.remove(obj)
+    def destroy_object(self, obj):
+        self.objects.remove(obj)
 
     async def create_entity(self, ent_type: Type[types.Entity], **kwargs):
         ent = ent_type(self.entity_ids.pop(), self, **kwargs)
@@ -150,6 +139,18 @@ class ServerProtocol(base.BaseProtocol):
     def broadcast_hud_message(self, message: str, team: types.Team =None):
         predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=CHAT.BIG, predicate=predicate)
+
+    async def player_joined(self, conn: 'connection.ServerConnection'):
+        print(f"player join {conn.id}")
+        self.players[conn.id] = conn
+
+    async def player_left(self, conn: 'connection.ServerConnection'):
+        print(f"player leave {conn.id}")
+        ply = self.players.pop(conn.id, None)
+        self.player_ids.push(conn.id)
+        if ply:  # PlayerLeft will crash the clients if the left player didn't actually join the game.
+            player_left.player_id = conn.id
+            await self.broadcast_loader(player_left)
 
     def get_state(self):
         state_data.fog_color.rgb = (0, 0, 0)

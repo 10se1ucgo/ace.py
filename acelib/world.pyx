@@ -1,3 +1,11 @@
+def cast_ray(vxl.VXLMap map, math3d.Vector3 pos, math3d.Vector3 dir, double length=32, bint isdirection=True):
+    cdef long x, y, z
+    if c_cast_ray(map.map_data, pos.c_vec[0], dir.c_vec[0], &x, &y, &z, length, isdirection):
+        return x, y, z
+    else:
+        return False
+
+
 cdef class World:
     def __init__(self, vxl.VXLMap map):
         self.map = map
@@ -28,13 +36,20 @@ cdef class WorldObject:
 
 
 cdef class Player:
-    def __cinit__(self, vxl.VXLMap map, *arg, **kwargs):
+    def __cinit__(self, vxl.VXLMap map):
         self.ply = new AcePlayer(map.map_data)
         self.position = math3d.new_proxy_vector(&self.ply.p)
         self.velocity = math3d.new_proxy_vector(&self.ply.v)
         self.orientation = math3d.new_proxy_vector(&self.ply.f)
 
+    def __init__(self, vxl.VXLMap map):
+        pass
+
     def __dealloc__(self):
+        # server segfaults when this is deallocated if this isnt done.
+        self.position.c_vec = NULL
+        self.velocity.c_vec = NULL
+        self.orientation.c_vec = NULL
         del self.ply
 
     def set_crouch(self, bint value):
@@ -89,4 +104,20 @@ cdef class Player:
         return self.ply.update(dt, time)
 
 
+cdef class Grenade:
+    def __cinit__(self, vxl.VXLMap map, double px, double py, double pz, double vx, double vy, double vz):
+        self.grenade = new AceGrenade(map.map_data, px, py, pz, vx, vy, vz)
+        self.position = math3d.new_proxy_vector(&self.grenade.p)
+        self.velocity = math3d.new_proxy_vector(&self.grenade.v)
 
+    def __init__(self, vxl.VXLMap map, double px, double py, double pz, double vx, double vy, double vz):
+        pass
+
+    def __dealloc__(self):
+        # server segfaults when this is deallocated if this isnt done.
+        self.position.c_vec = NULL
+        self.velocity.c_vec = NULL
+        del self.grenade
+
+    def update(self, double dt, double time):
+        return self.grenade.update(dt, time)

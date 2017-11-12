@@ -54,6 +54,7 @@ class BaseProtocol:
         print("Disconnected clients")
         self.host.flush()
         print("Flushed host")
+        self.loop.stop()
 
     async def update(self, dt):
         pass # await self.net_update(dt)

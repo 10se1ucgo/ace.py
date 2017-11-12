@@ -229,6 +229,9 @@ class RPG(Weapon):
 
     damage = {HIT.TORSO: None, HIT.HEAD: None, HIT.ARMS: None, HIT.LEGS: None}
 
+    async def update(self, dt):
+        pass
+
 
 WEAPONS = {cls.type: cls for cls in Weapon.__subclasses__()}
 

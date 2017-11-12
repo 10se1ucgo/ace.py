@@ -185,13 +185,13 @@ Vector3<T> Vector3<T>::operator/(const T &other) const {
 
 template<typename T>
 Vector3<T> &Vector3<T>::operator+=(const Vector3<T> &b) {
-    this.x += b.x; this.y += b.y; this.z += b.z;
+    this->x += b.x; this->y += b.y; this->z += b.z;
     return *this;
 }
 
 template<typename T>
 Vector3<T> &Vector3<T>::operator-=(const Vector3<T> &b) {
-    this.x -= b.x; this.y -= b.y; this.z -= b.z;
+    this->x -= b.x; this->y -= b.y; this->z -= b.z;
     return *this;
 }
 

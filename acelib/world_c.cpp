@@ -7,10 +7,10 @@ constexpr float FALL_SLOW_DOWN = 0.24f;
 constexpr float FALL_DAMAGE_VELOCITY = 0.58f;
 constexpr int FALL_DAMAGE_SCALAR = 4096;
 
-typedef Vector3<double> Vec3f;  // yes this is a lie i know, its only a double to match the wrapped Python math3d.Vector3 type.
+typedef Vector3<double> Vector;
 
 struct Orientation {
-    Vec3f f, s, h;
+    Vector f, s, h;
 };
 
 struct AcePlayer {
@@ -23,14 +23,13 @@ struct AcePlayer {
         this->alive = true;
         this->lastclimb = 0.0;
     }
-
     long update(double dt, double time);
     void set_orientation(double x, double y, double z);
 
     AceMap *map;
     bool mf, mb, ml, mr, jump, crouch, sneak, sprint, primary_fire, secondary_fire, airborne, wade, alive, weapon;
     double lastclimb;
-    Vec3f p, e, v, f, s, h;
+    Vector p, e, v, f, s, h;
 
 private:
     void boxclipmove(double dt, double time);
@@ -38,15 +37,14 @@ private:
 };
 
 struct AceGrenade {
-    AceGrenade(AceMap *map, Vec3f position, Vec3f velocity) : map(map), p(position), v(velocity) {
+    AceGrenade(AceMap *map, Vector position, Vector velocity) : map(map), p(position), v(velocity) {
     }
     AceGrenade(AceMap *map, double px, double py, double pz, double vx, double vy, double vz) : map(map), p(px, py, pz), v(vx, vy, vz) {
     }
-
     bool update(double dt, double time);
 
     AceMap *map;
-    Vec3f p, v;
+    Vector p, v;
 };
 
 // should these be methods on AceMap ?
@@ -267,7 +265,7 @@ void AcePlayer::reposition(double dt, double time) {
 }
 
 bool AceGrenade::update(double dt, double time) {
-    Vec3f fpos = this->p; //old position
+    Vector fpos = this->p; //old position
 
     //do velocity & gravity (friction is negligible)
     float f = dt * 32;
@@ -294,6 +292,78 @@ bool AceGrenade::update(double dt, double time) {
     return false;
 }
 
+bool cast_ray(AceMap *map, const Vector &position, const Vector &direction, long *x, long *y, long *z, float length=32, bool isdirection=true) {
+    double x0 = position.x; double y0 = position.y; double z0 = position.z;
+    double x1 = direction.x; double y1 = direction.y; double z1 = direction.z;
+
+    if (isdirection) {
+        x1 = x0 + x1 * length;
+        y1 = y0 + y1 * length;
+        z1 = z0 + z1 * length;
+    }
+
+    Vector f, g;
+    Vector3<long> a, c, d, p, i;
+    long cnt = 0;
+
+    a.set(x0 - .5, y0 - .5, z0 - .5);
+    c.set(x1 - .5, y1 - .5, z1 - .5);
+
+    if (c.x <  a.x) {
+        d.x = -1; f.x = x0 - a.x; g.x = (x0 - x1) * 1024; cnt += a.x - c.x;
+    }
+    else if (c.x != a.x) {
+        d.x = 1; f.x = a.x + 1 - x0; g.x = (x1 - x0) * 1024; cnt += c.x - a.x;
+    }
+    else
+        f.x = g.x = 0;
+    if (c.y <  a.y) {
+        d.y = -1; f.y = y0 - a.y;   g.y = (y0 - y1) * 1024; cnt += a.y - c.y;
+    }
+    else if (c.y != a.y) {
+        d.y = 1; f.y = a.y + 1 - y0; g.y = (y1 - y0) * 1024; cnt += c.y - a.y;
+    }
+    else
+        f.y = g.y = 0;
+    if (c.z <  a.z) {
+        d.z = -1; f.z = z0 - a.z;   g.z = (z0 - z1) * 1024; cnt += a.z - c.z;
+    }
+    else if (c.z != a.z) {
+        d.z = 1; f.z = a.z + 1 - z0; g.z = (z1 - z0) * 1024; cnt += c.z - a.z;
+    }
+    else
+        f.z = g.z = 0;
+
+    p.set(f.x*g.z - f.z*g.x,
+          f.y*g.z - f.z*g.y,
+          f.y*g.x - f.x*g.y);
+    i.set(g.x, g.y, g.z);
+
+    if (cnt > length)
+        cnt = length;
+    while (cnt)
+    {
+        if (((p.x | p.y) >= 0) && (a.z != c.z)) {
+            a.z += d.z; p.x -= i.x; p.y -= i.y;
+        }
+        else if ((p.z >= 0) && (a.x != c.x)) {
+            a.x += d.x; p.x += i.z; p.z -= i.y;
+        }
+        else {
+            a.y += d.y; p.y += i.z; p.z += i.x;
+        }
+
+        if (map->get_solid(a.x, a.y, a.z, true)) {
+            *x = a.x;
+            *y = a.y;
+            *z = a.z;
+            return true;
+        }
+        cnt--;
+    }
+    return false;
+}
+
 
 //inline void get_orientation(Orientation * o, float x, float y, float z) {
 //    float f = sqrtf(x*x + y*y);
@@ -303,7 +373,7 @@ bool AceGrenade::update(double dt, double time) {
 //}
 //
 //
-//inline void set_orientation_vectors(float x, float y, float z, Vec3f * s, Vec3f * h)
+//inline void set_orientation_vectors(float x, float y, float z, Vector * s, Vector * h)
 //{
 //    float f = sqrtf(x*x + y*y);
 //    s->x = -y / f;

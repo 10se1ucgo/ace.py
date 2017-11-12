@@ -3,17 +3,14 @@ The (eventually) default set of commands
 
 Creator: 10se1ucgo
 """
+import asyncio
 import inspect
 
+from acelib.world import cast_ray
 from aceserver import types
 from aceserver.protocol import ServerProtocol
 from aceserver.connection import ServerConnection
 from acescripts import Script, commands
-
-import aceserver
-import acelib
-import acescripts
-import acemodes
 
 
 class EssentialsScript(Script):
@@ -68,6 +65,15 @@ class EssentialsScript(Script):
                     z = self.protocol.map.get_z(x, y)
                 pos = (x, y, z)
             await self.protocol.create_entity(ent_type=type, position=pos, team=connection.team)
+
+    @commands.command()
+    async def test_raycast(self, connection: ServerConnection):
+        for x in range(10):
+            pos = cast_ray(connection.protocol.map, connection.position, connection.orientation, length=256)
+            if not pos:
+                return
+            await connection.destroy_block(*pos)
+            await asyncio.sleep(1)
 
     @commands.command()
     async def a(self, connection: ServerConnection, source: str):

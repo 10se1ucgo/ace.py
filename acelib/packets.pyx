@@ -2,9 +2,9 @@ cimport cython
 from libc.stdint cimport *
 from libcpp cimport bool
 
-from .bytes cimport ByteReader, ByteWriter
-from .util cimport read_position, write_position, read_color, write_color
-from . import constants
+from acelib.bytes cimport ByteReader, ByteWriter
+from acelib.util cimport read_position, write_position, read_color, write_color
+from acelib import constants
 
 
 @cython.freelist(64)

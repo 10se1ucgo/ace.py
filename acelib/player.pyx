@@ -1,6 +1,5 @@
-from .math3d cimport Vector3
-
-cimport world
+from acelib cimport world
+from acelib.math3d cimport Vector3
 
 
 cdef class Player(world.WorldObject):

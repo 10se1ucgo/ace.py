@@ -18,48 +18,24 @@ struct AcePlayer {
         this->map = map;
         this->mf = this->mb = this->ml = this->mr = false;
         this->jump = this->crouch = this->sneak = this->sprint = false;
-        this->primary_fire = this->secondary_fire = false;
+        this->primary_fire = this->secondary_fire = this->weapon = false;
         this->airborne = this->wade = false;
         this->alive = true;
-        this->weapon = 0;
-        this->lastclimb = 0.0f;
+        this->lastclimb = 0.0;
     }
 
+    long update(double dt, double time);
+    void set_orientation(double x, double y, double z);
+
     AceMap *map;
-    bool mf, mb, ml, mr, jump, crouch, sneak, sprint, primary_fire, secondary_fire, airborne, wade, alive;
-    float lastclimb;
-    int weapon;
+    bool mf, mb, ml, mr, jump, crouch, sneak, sprint, primary_fire, secondary_fire, airborne, wade, alive, weapon;
+    double lastclimb;
     Vec3f p, e, v, f, s, h;
+
+private:
+    void boxclipmove(double dt, double time);
+    void reposition(double dt, double time);
 };
-
-inline void get_orientation(Orientation * o, float x, float y, float z) {
-    o->f.set(x, y, z);
-    float f = sqrtf(x*x + y*y);
-    o->s.x = -y / f;
-    o->s.y = x / f;
-    o->s.z = 0.0f;
-    o->h.x = -z*o->s.y;
-    o->h.y = z*o->s.x;
-    o->h.z = x*o->s.y - y*o->s.x;
-}
-
-
-inline void set_orientation_vectors(float x, float y, float z, Vec3f * s, Vec3f * h)
-{
-    float f = sqrtf(x*x + y*y);
-    s->x = -y / f;
-    s->y = x / f;
-    h->x = -z*s->y;
-    h->y = z*s->x;
-    h->z = x*s->y - y*s->x;
-}
-
-void reorient_player(AcePlayer *p, float x, float y, float z)
-{
-    p->f.set(x, y, z);
-    set_orientation_vectors(x, y, z, &p->s, &p->h);
-}
-
 
 //same as isvoxelsolid but water is empty && out of bounds returns true
 int clipbox(AceMap *map, float x, float y, float z)
@@ -78,28 +54,89 @@ int clipbox(AceMap *map, float x, float y, float z)
     return map->get_solid((int)x, (int)y, sz);
 }
 
-void reposition_player(AcePlayer *p, Vec3f *position, double dt, double time)
-{
-    float f; /* FIXME meaningful name */
+long AcePlayer::update(double dt, double time) {
+    //move player and perform simple physics (gravity, momentum, friction)
+    if (this->jump)
+    {
+        this->jump = false;
+        this->v.z = -0.36f;
+    }
 
-    p->e = p->p = *position;
-    f = p->lastclimb - time; /* FIXME meaningful name */
-    if (f>-0.25f)
-        p->e.z += (f + 0.25f) / 0.25f;
+    float f = dt; //player acceleration scalar
+    if (this->airborne)
+        f *= 0.1f;
+    else if (this->crouch)
+        f *= 0.3f;
+    else if ((this->secondary_fire && this->weapon) || this->sneak)
+        f *= 0.5f;
+    else if (this->sprint)
+        f *= 1.3f;
+
+    if ((this->mf || this->mb) && (this->ml || this->mr))
+        f *= sqrt(0.5); //if strafe + forward/backwards then limit diagonal velocity
+
+    if (this->mf)
+    {
+        this->v.x += this->f.x*f;
+        this->v.y += this->f.y*f;
+    }
+    else if (this->mb)
+    {
+        this->v.x -= this->f.x*f;
+        this->v.y -= this->f.y*f;
+    }
+    if (this->ml)
+    {
+        this->v.x -= this->s.x*f;
+        this->v.y -= this->s.y*f;
+    }
+    else if (this->mr)
+    {
+        this->v.x += this->s.x*f;
+        this->v.y += this->s.y*f;
+    }
+
+    f = dt + 1;
+    this->v.z += dt;
+    this->v.z /= f; //air friction
+    if (this->wade)
+        f = dt*6.f + 1; //water friction
+    else if (!this->airborne)
+        f = dt*4.f + 1; //ground friction
+    this->v.x /= f;
+    this->v.y /= f;
+    float f2 = this->v.z;
+    this->boxclipmove(dt, time);
+    //hit ground... check if hurt
+    if (!this->v.z && (f2 > FALL_SLOW_DOWN))
+    {
+        //slow down on landing
+        this->v.x *= 0.5f;
+        this->v.y *= 0.5f;
+
+        //return fall damage
+        if (f2 > FALL_DAMAGE_VELOCITY)
+        {
+            f2 -= FALL_DAMAGE_VELOCITY;
+            return f2 * f2 * FALL_DAMAGE_SCALAR;
+        }
+
+        return -1; // no fall damage but play fall sound
+    }
+
+    return 0; //no fall damage
 }
 
+void AcePlayer::set_orientation(double x, double y, double z) {
+    float f = sqrtf(x*x + y*y);
+    this->f.set(x, y, z);
+    this->s.set(-y / f, x / f, 0.0);
+    this->h.set(-z * this->s.y, z * this->s.x, (x * this->s.y) - (y * this->s.x));
+}
 
-// player movement with autoclimb
-void boxclipmove(AcePlayer *p, double dt, double time)
-{
-    float offset, m, f, nx, ny, nz, z;
-    long climb = 0;
-
-    f = dt*32.f;
-    nx = f*p->v.x + p->p.x;
-    ny = f*p->v.y + p->p.y;
-
-    if (p->crouch)
+void AcePlayer::boxclipmove(double dt, double time) {
+    float offset, m;
+    if (this->crouch)
     {
         offset = 0.45f;
         m = 0.9f;
@@ -110,155 +147,111 @@ void boxclipmove(AcePlayer *p, double dt, double time)
         m = 1.35f;
     }
 
-    nz = p->p.z + offset;
+    float f = dt * 32.f;
+    float nx = f * this->v.x + this->p.x;
+    float ny = f * this->v.y + this->p.y;
+    float nz = this->p.z + offset;
 
-    if (p->v.x < 0) f = -0.45f;
+    bool climb = false;
+    if (this->v.x < 0) f = -0.45f;
     else f = 0.45f;
-    z = m;
-    while (z >= -1.36f && !clipbox(p->map, nx + f, p->p.y - 0.45f, nz + z) && !clipbox(p->map, nx + f, p->p.y + 0.45f, nz + z))
+    float z = m;
+    while (z >= -1.36f && !clipbox(this->map, nx + f, this->p.y - 0.45f, nz + z) && !clipbox(this->map, nx + f, this->p.y + 0.45f, nz + z))
         z -= 0.9f;
-    if (z<-1.36f) p->p.x = nx;
-    else if (!p->crouch && p->f.z<0.5f && !p->sprint)
+    if (z<-1.36f) this->p.x = nx;
+    else if (!this->crouch && this->f.z<0.5f && !this->sprint)
     {
         z = 0.35f;
-        while (z >= -2.36f && !clipbox(p->map, nx + f, p->p.y - 0.45f, nz + z) && !clipbox(p->map, nx + f, p->p.y + 0.45f, nz + z))
+        while (z >= -2.36f && !clipbox(this->map, nx + f, this->p.y - 0.45f, nz + z) && !clipbox(this->map, nx + f, this->p.y + 0.45f, nz + z))
             z -= 0.9f;
         if (z<-2.36f)
         {
-            p->p.x = nx;
-            climb = 1;
+            this->p.x = nx;
+            climb = true;
         }
-        else p->v.x = 0;
+        else this->v.x = 0;
     }
-    else p->v.x = 0;
+    else this->v.x = 0;
 
-    if (p->v.y < 0) f = -0.45f;
+    if (this->v.y < 0) f = -0.45f;
     else f = 0.45f;
     z = m;
-    while (z >= -1.36f && !clipbox(p->map, p->p.x - 0.45f, ny + f, nz + z) && !clipbox(p->map, p->p.x + 0.45f, ny + f, nz + z))
+    while (z >= -1.36f && !clipbox(this->map, this->p.x - 0.45f, ny + f, nz + z) && !clipbox(this->map, this->p.x + 0.45f, ny + f, nz + z))
         z -= 0.9f;
-    if (z<-1.36f) p->p.y = ny;
-    else if (!p->crouch && p->f.z<0.5f && !p->sprint && !climb)
+    if (z<-1.36f) this->p.y = ny;
+    else if (!this->crouch && this->f.z<0.5f && !this->sprint && !climb)
     {
         z = 0.35f;
-        while (z >= -2.36f && !clipbox(p->map, p->p.x - 0.45f, ny + f, nz + z) && !clipbox(p->map, p->p.x + 0.45f, ny + f, nz + z))
+        while (z >= -2.36f && !clipbox(this->map, this->p.x - 0.45f, ny + f, nz + z) && !clipbox(this->map, this->p.x + 0.45f, ny + f, nz + z))
             z -= 0.9f;
         if (z<-2.36f)
         {
-            p->p.y = ny;
-            climb = 1;
+            this->p.y = ny;
+            climb = true;
         }
-        else p->v.y = 0;
+        else this->v.y = 0;
     }
     else if (!climb)
-        p->v.y = 0;
+        this->v.y = 0;
 
     if (climb)
     {
-        p->v.x *= 0.5f;
-        p->v.y *= 0.5f;
-        p->lastclimb = time;
+        this->v.x *= 0.5f;
+        this->v.y *= 0.5f;
+        this->lastclimb = time;
         nz--;
         m = -1.35f;
     }
     else
     {
-        if (p->v.z < 0)
+        if (this->v.z < 0)
             m = -m;
-        nz += p->v.z*dt*32.f;
+        nz += this->v.z*dt*32.f;
     }
 
-    p->airborne = 1;
+    this->airborne = true;
 
-    if (clipbox(p->map, p->p.x - 0.45f, p->p.y - 0.45f, nz + m) ||
-        clipbox(p->map, p->p.x - 0.45f, p->p.y + 0.45f, nz + m) ||
-        clipbox(p->map, p->p.x + 0.45f, p->p.y - 0.45f, nz + m) ||
-        clipbox(p->map, p->p.x + 0.45f, p->p.y + 0.45f, nz + m))
+    if (clipbox(this->map, this->p.x - 0.45f, this->p.y - 0.45f, nz + m) ||
+        clipbox(this->map, this->p.x - 0.45f, this->p.y + 0.45f, nz + m) ||
+        clipbox(this->map, this->p.x + 0.45f, this->p.y - 0.45f, nz + m) ||
+        clipbox(this->map, this->p.x + 0.45f, this->p.y + 0.45f, nz + m))
     {
-        if (p->v.z >= 0)
+        if (this->v.z >= 0)
         {
-            p->wade = p->p.z > 61;
-            p->airborne = 0;
+            this->wade = this->p.z > 61;
+            this->airborne = false;
         }
-        p->v.z = 0;
+        this->v.z = 0;
     }
     else
-        p->p.z = nz - offset;
+        this->p.z = nz - offset;
 
-    reposition_player(p, &p->p, dt, time);
+    this->reposition(dt, time);
+}
+
+void AcePlayer::reposition(double dt, double time) {
+    this->e.set(this->p.x, this->p.y, this->p.z);
+    double f = this->lastclimb - time; /* FIXME meaningful name */
+    if (f>-0.25f)
+        this->e.z += (f + 0.25f) / 0.25f;
 }
 
 
-long move_player(AcePlayer *p, double dt, double time) {
 
-    //move player and perform simple physics (gravity, momentum, friction)
-    if (p->jump)
-    {
-        p->jump = false;
-        p->v.z = -0.36f;
-    }
-
-    float f = dt; //player acceleration scalar
-    if (p->airborne)
-        f *= 0.1f;
-    else if (p->crouch)
-        f *= 0.3f;
-    else if ((p->secondary_fire && p->weapon) || p->sneak)
-        f *= 0.5f;
-    else if (p->sprint)
-        f *= 1.3f;
-
-    if ((p->mf || p->mb) && (p->ml || p->mr))
-        f *= sqrt(0.5); //if strafe + forward/backwards then limit diagonal velocity
-
-    if (p->mf)
-    {
-        p->v.x += p->f.x*f;
-        p->v.y += p->f.y*f;
-    }
-    else if (p->mb)
-    {
-        p->v.x -= p->f.x*f;
-        p->v.y -= p->f.y*f;
-    }
-    if (p->ml)
-    {
-        p->v.x -= p->s.x*f;
-        p->v.y -= p->s.y*f;
-    }
-    else if (p->mr)
-    {
-        p->v.x += p->s.x*f;
-        p->v.y += p->s.y*f;
-    }
-
-    f = dt + 1;
-    p->v.z += dt;
-    p->v.z /= f; //air friction
-    if (p->wade)
-        f = dt*6.f + 1; //water friction
-    else if (!p->airborne)
-        f = dt*4.f + 1; //ground friction
-    p->v.x /= f;
-    p->v.y /= f;
-    float f2 = p->v.z;
-    boxclipmove(p, dt, time);
-    //hit ground... check if hurt
-    if (!p->v.z && (f2 > FALL_SLOW_DOWN))
-    {
-        //slow down on landing
-        p->v.x *= 0.5f;
-        p->v.y *= 0.5f;
-
-        //return fall damage
-        if (f2 > FALL_DAMAGE_VELOCITY)
-        {
-            f2 -= FALL_DAMAGE_VELOCITY;
-            return f2 * f2 * FALL_DAMAGE_SCALAR;
-        }
-
-        return(-1); // no fall damage but play fall sound
-    }
-
-    return(0); //no fall damage
-}
+//inline void get_orientation(Orientation * o, float x, float y, float z) {
+//    float f = sqrtf(x*x + y*y);
+//    o->f.set(x, y, z);
+//    o->s.set(-y / f, x / f, 0.0);
+//    o->h.set(-z * o->s.y, z * o->s.x, (x * o->s.y) - (y * o->s.x));
+//}
+//
+//
+//inline void set_orientation_vectors(float x, float y, float z, Vec3f * s, Vec3f * h)
+//{
+//    float f = sqrtf(x*x + y*y);
+//    s->x = -y / f;
+//    s->y = x / f;
+//    h->x = -z*s->y;
+//    h->y = z*s->x;
+//    h->z = x*s->y - y*s->x;
+//}

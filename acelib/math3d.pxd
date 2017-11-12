@@ -1,4 +1,4 @@
-from . cimport math3d_c
+from acelib cimport math3d_c
 
 cdef class Vector3:
     cdef math3d_c.Vector3[double] *c_vec

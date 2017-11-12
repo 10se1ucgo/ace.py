@@ -269,14 +269,14 @@ class ServerConnection(base.BaseConnection):
             return True
         return False
 
-    async def set_position(self, x=None, y=None, z=None):
+    async def set_position(self, x=None, y=None, z=None, reset=True):
         if x is None or y is None:
             x, y, z = self.position.xyz
         else:
             if z is None:
                 z = self.protocol.map.get_z(x, y) - 2
         print(f"Setting pos to {x}, {y}, {z}")
-        self.wo.set_position(x, y, z, True)
+        self.wo.set_position(x, y, z, reset)
         position_data.data.xyz = x, y, z
         await self.send_loader(position_data)
 
@@ -316,7 +316,7 @@ class ServerConnection(base.BaseConnection):
 
         pos: math3d.Vector3 = math3d.Vector3(loader.data.x, loader.data.y, loader.data.z)
         if pos.sq_distance(self.wo.position) >= 3 ** 2:
-            await self.set_position()
+            await self.set_position(reset=False)
         else:
             self.wo.set_position(loader.data.x, loader.data.y, loader.data.z)
 

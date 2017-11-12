@@ -33,7 +33,7 @@ class ScriptLoader:
     def unload_scripts(self):
         for script in reversed(self.scripts.values()):
             script.deinit()
-        self.scripts = {}
+        self.scripts = OrderedDict()
 
     def get(self, name: str):
         return self.scripts.get(name)

@@ -46,10 +46,6 @@ cdef class Player:
         pass
 
     def __dealloc__(self):
-        # server segfaults when this is deallocated if this isnt done.
-        self.position.c_vec = NULL
-        self.velocity.c_vec = NULL
-        self.orientation.c_vec = NULL
         del self.ply
 
     def set_crouch(self, bint value):
@@ -114,9 +110,6 @@ cdef class Grenade:
         pass
 
     def __dealloc__(self):
-        # server segfaults when this is deallocated if this isnt done.
-        self.position.c_vec = NULL
-        self.velocity.c_vec = NULL
         del self.grenade
 
     def update(self, double dt, double time):

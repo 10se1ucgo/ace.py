@@ -6,9 +6,11 @@ cdef class Vector3:
     def __cinit__(self, double x=0, double y=0, double z=0, bint ref=False):
         if not ref:
             self.c_vec = new math3d_c.Vector3[double](x, y, z)
+        self.is_ref = ref
 
     def __dealloc__(self):
-        del self.c_vec
+        if not self.is_ref:
+            del self.c_vec
 
     def __init__(self, double x=0, double y=0, double z=0, bint ref=False):
         pass

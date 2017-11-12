@@ -1,7 +1,9 @@
 from acelib cimport math3d_c
 
 cdef class Vector3:
-    cdef math3d_c.Vector3[double] *c_vec
+    cdef:
+        math3d_c.Vector3[double] *c_vec
+        bint is_ref
     cpdef void set(self, double x, double y, double z)
     cpdef void normalize(self)
     cpdef double sq_magnitude(self)

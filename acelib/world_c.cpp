@@ -7,7 +7,7 @@ constexpr float FALL_SLOW_DOWN = 0.24f;
 constexpr float FALL_DAMAGE_VELOCITY = 0.58f;
 constexpr int FALL_DAMAGE_SCALAR = 4096;
 
-typedef Vector3<double> Vec3f;
+typedef Vector3<double> Vec3f;  // yes this is a lie i know, its only a double to match the wrapped Python math3d.Vector3 type.
 
 struct Orientation {
     Vec3f f, s, h;
@@ -37,21 +37,51 @@ private:
     void reposition(double dt, double time);
 };
 
-//same as isvoxelsolid but water is empty && out of bounds returns true
-int clipbox(AceMap *map, float x, float y, float z)
-{
-    int sz;
+struct AceGrenade {
+    AceGrenade(AceMap *map, Vec3f position, Vec3f velocity) : map(map), p(position), v(velocity) {
+    }
+    AceGrenade(AceMap *map, double px, double py, double pz, double vx, double vy, double vz) : map(map), p(px, py, pz), v(vx, vy, vz) {
+    }
 
+    bool update(double dt, double time);
+
+    AceMap *map;
+    Vec3f p, v;
+};
+
+// should these be methods on AceMap ?
+//same as isvoxelsolid but water is empty && out of bounds returns true
+bool clipbox(AceMap *map, float x, float y, float z)
+{
     if (x < 0 || x >= MAP_X || y < 0 || y >= MAP_Y)
-        return 1;
-    else if (z < 0)
-        return 0;
-    sz = (int)z;
+        return true;
+    if (z < 0)
+        return false;
+
+    int sz = z;
     if (sz == MAP_Z - 1)
         sz -= 1;
     else if (sz >= MAP_Z)
-        return 1;
-    return map->get_solid((int)x, (int)y, sz);
+        return true;
+    return map->get_solid(x, y, sz);
+}
+
+//same as isvoxelsolid but water is empty
+bool clipworld(AceMap *map, long x, long y, long z)
+{
+    if (x < 0 || x >= MAP_X || y < 0 || y >= MAP_Y)
+        return false;
+    if (z < 0)
+        return false;
+
+    int sz = z;
+    if (sz == 63)
+        sz = 62;
+    else if (sz >= 63)
+        return true;
+    else if (sz < 0)
+        return false;
+    return map->get_solid(x, y, sz);
 }
 
 long AcePlayer::update(double dt, double time) {
@@ -236,6 +266,33 @@ void AcePlayer::reposition(double dt, double time) {
         this->e.z += (f + 0.25f) / 0.25f;
 }
 
+bool AceGrenade::update(double dt, double time) {
+    Vec3f fpos = this->p; //old position
+
+    //do velocity & gravity (friction is negligible)
+    float f = dt * 32;
+    this->v.z += dt;
+    // yikes, my vector type operator overloading actually has a use!!!
+    this->p += this->v * f;
+
+    //make it bounce (accurate)
+    Vector3<long> lp(floor(this->p.x), floor(this->p.y), floor(this->p.z));
+
+    if (clipworld(this->map, lp.x, lp.y, lp.z)) { //hit a wall
+        Vector3<long> lp2(floor(fpos.x), floor(fpos.y), floor(fpos.z));
+        if (lp.z != lp2.z && ((lp.x == lp2.x && lp.y == lp2.y) || !clipworld(this->map, lp.x, lp.y, lp2.z)))
+            this->v.z = -this->v.z;
+        else if (lp.x != lp2.x && ((lp.y == lp2.y && lp.z == lp2.z) || !clipworld(this->map, lp2.x, lp.y, lp.z)))
+            this->v.x = -this->v.x;
+        else if (lp.y != lp2.y && ((lp.x == lp2.x && lp.z == lp2.z) || !clipworld(this->map, lp.x, lp2.y, lp.z)))
+            this->v.y = -this->v.y;
+
+        this->p = fpos; //set back to old position
+        this->v *= 0.36;
+        return true;
+    }
+    return false;
+}
 
 
 //inline void get_orientation(Orientation * o, float x, float y, float z) {

@@ -9,7 +9,7 @@ link_args = []
 compile_args = []
 
 for name in names:
-    #                                                                 TODO: FIX THIS
+    #                                                                 TODO: FIX THIS (build as library?)
     modules.append(Extension(name, [f"{name.replace('.', '/')}.pyx", "acelib/vxl_c.cpp"], language="c++", include_dirs=['acelib']))
 
 setup(

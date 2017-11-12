@@ -1,5 +1,5 @@
 cdef class World:
-    def __init__(self, VXLMap map):
+    def __init__(self, vxl.VXLMap map):
         self.map = map
         self.objects = []
 
@@ -20,7 +20,7 @@ cdef class World:
         return new_object
 
 cdef class WorldObject:
-    def __init__(self, VXLMap map, *arg, **kwargs):
+    def __init__(self, vxl.VXLMap map, *arg, **kwargs):
         self.map = map
 
     cdef long update(self, double dt, double time):
@@ -28,7 +28,7 @@ cdef class WorldObject:
 
 
 cdef class Player:
-    def __cinit__(self, VXLMap map, *arg, **kwargs):
+    def __cinit__(self, vxl.VXLMap map, *arg, **kwargs):
         self.ply = new AcePlayer(map.map_data)
         self.position = math3d.new_proxy_vector(&self.ply.p)
         self.velocity = math3d.new_proxy_vector(&self.ply.v)
@@ -83,10 +83,10 @@ cdef class Player:
         return not self.ply.alive
 
     def set_orientation(self, double x, double y, double z):
-        reorient_player(self.ply, x, y, z)
+        self.ply.set_orientation(x, y, z)
 
     def update(self, double dt, double time):
-        return move_player(self.ply, dt, time)
+        return self.ply.update(dt, time)
 
 
 

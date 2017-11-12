@@ -153,7 +153,6 @@ bool AceMap::get_solid(int x, int y, int z, bool wrapped) {
     if (wrapped) {
         x &= (MAP_X - 1);
         y &= (MAP_Y - 1);
-        z &= (MAP_Z - 1);
     }
     if (!is_valid_pos(x, y, z))
         return false;
@@ -164,7 +163,6 @@ uint32_t AceMap::get_color(int x, int y, int z, bool wrapped) {
     if (wrapped) {
         x &= (MAP_X - 1);
         y &= (MAP_Y - 1);
-        z &= (MAP_Z - 1);
     }
     if (!is_valid_pos(x, y, z)) return 0;
     return this->colors[get_pos(x, y, z)];

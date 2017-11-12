@@ -1,3 +1,4 @@
+# distutils: sources = acelib/vxl_c.cpp
 from libc.stdint cimport *
 from libcpp.vector cimport vector
 from libcpp cimport bool

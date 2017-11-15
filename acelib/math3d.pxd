@@ -40,3 +40,24 @@ cdef inline Vector3 new_proxy_vector(math3d_c.Vector3[double] *other):
     cdef Vector3 vec = Vector3(ref=True)
     vec.c_vec = other
     return vec
+
+
+cdef class Matrix4x4:
+    cdef public double a, b, c, d, \
+                       e, f, g, h, \
+                       i, j, k, l, \
+                       m, n, o, p
+
+    cdef double **as_array
+
+
+cdef inline Matrix4x4 new_mat4x4(double a, double b, double c, double d,
+                                 double e, double f, double g, double h,
+                                 double i, double j, double k, double l,
+                                 double m, double n, double o, double p):
+    cdef Matrix4x4 mat4x4 = Matrix4x4()
+    mat4x4.a = a; mat4x4.b = b; mat4x4.c = c; mat4x4.d = d
+    mat4x4.e = e; mat4x4.f = f; mat4x4.g = g; mat4x4.h = h
+    mat4x4.i = i; mat4x4.j = j; mat4x4.k = k; mat4x4.l = l
+    mat4x4.m = m; mat4x4.n = n; mat4x4.o = o; mat4x4.p = p
+    return mat4x4

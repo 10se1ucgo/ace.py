@@ -43,8 +43,8 @@ class BaseProtocol:
             dt = now - last
             self.time += dt
             await self.update(dt)
-            await asyncio.sleep(1 / 64)
-            # print(self.time, now - start, 1 / (dt or 1))
+            # await asyncio.sleep(1 / 64)
+            # print(self.time, 1 / (dt or 1))
             last = now
 
     def stop(self):

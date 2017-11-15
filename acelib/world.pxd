@@ -25,6 +25,8 @@ cdef extern from "world_c.cpp" nogil:
                                 const math3d_c.Vector3[double] &position, const math3d_c.Vector3[double] &direction,
                                 long *x, long *y, long *z, float length, bool isdirection)
 
+    bool clipbox(vxl.AceMap *map, float x, float y, float z)
+
 # cdef class World:
 #     cdef public:
 #         VXLMap map
@@ -52,3 +54,8 @@ cdef class Grenade:
     cdef public:
         math3d.Vector3 position, velocity
 
+
+cdef class GenericMovement:
+    cdef public:
+        vxl.VXLMap map
+        math3d.Vector3 position

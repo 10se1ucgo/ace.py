@@ -1,3 +1,4 @@
+import math
 import inspect
 import traceback
 import ipaddress
@@ -115,3 +116,7 @@ def read_identifier(ident: str, default_port: int=32887) -> Tuple[IPAddress, int
     else:
         host, port = pair, default_port
     return ipaddress.ip_address(int(host)), int(port)
+
+
+def bad_float(*args):
+    return any(not math.isfinite(arg) for arg in args)

@@ -1,6 +1,7 @@
 import asyncio
 import textwrap
 import zlib
+from contextlib import contextmanager
 from typing import *
 
 import enet
@@ -28,6 +29,9 @@ class ServerProtocol(base.BaseProtocol):
                 self.packs.append((data, len(data), zlib.crc32(data)))
 
         self.player_ids = util.IDPool(stop=32)
+        # Client treats SetColor packets with player IDs >= 32 to be custom, server defined color data to store.
+        # BlockAction then can use these player IDs for custom colors.
+        self.color_ids = util.IDPool(start=32, stop=255)
         self.entity_ids = util.IDPool(stop=255)
         self.sound_ids = util.IDPool(stop=255)
 
@@ -37,13 +41,15 @@ class ServerProtocol(base.BaseProtocol):
         self.team2.other = self.team1
         self.teams = {self.team1.id: self.team1, self.team2.id: self.team2}
 
+        self.fog_color = (128, 232, 255)
+
         self.players: Dict[int, connection.ServerConnection] = {}
         self.entities: Dict[int, types.Entity] = {}
         self.sounds: Dict[int, types.Sound] = {}
         self.objects: List[Any] = []
 
         # TODO: configs
-        self.mode: GameMode = de.Defusal(self)
+        self.mode: GameMode = ctf.CTF(self)
         self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor", "greeting"]})
         self.max_respawn_time = 5
 
@@ -118,6 +124,12 @@ class ServerProtocol(base.BaseProtocol):
             self.sounds.pop(sound.id)
             self.sound_ids.push(sound.id)
 
+    @contextmanager
+    def block_color(self):
+        id = self.color_ids.pop()
+        yield id
+        self.color_ids.push(id)
+
     @util.static_vars(wrapper=textwrap.TextWrapper(width=MAX_CHAT_SIZE))
     async def broadcast_message(self, message: str, chat_type=CHAT.SYSTEM, player_id=0xFF, predicate=None):
         chat_message.chat_type = chat_type
@@ -153,7 +165,7 @@ class ServerProtocol(base.BaseProtocol):
             await self.broadcast_loader(player_left)
 
     def get_state(self):
-        state_data.fog_color.rgb = (0, 0, 0)
+        state_data.fog_color.rgb = self.fog_color
 
         state_data.team1_color.rgb = self.team1.color
         state_data.team1_name = self.team1.name

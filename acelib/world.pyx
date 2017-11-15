@@ -1,3 +1,6 @@
+cdef extern from "math.h":
+    double floor(double x)
+
 def cast_ray(vxl.VXLMap map, math3d.Vector3 pos, math3d.Vector3 dir, double length=32, bint isdirection=True):
     cdef long x, y, z
     if c_cast_ray(map.map_data, pos.c_vec[0], dir.c_vec[0], &x, &y, &z, length, isdirection):
@@ -114,3 +117,13 @@ cdef class Grenade:
 
     def update(self, double dt, double time):
         return self.grenade.update(dt, time)
+
+
+# A generic object with collision detection
+cdef class GenericMovement:
+    def __init__(self, vxl.VXLMap map, double x, double y, double z):
+        self.map = map
+        self.position = math3d.Vector3(x, y, z)
+
+    def update(self, double dt, double time):
+        return clipbox(self.map.map_data, floor(self.position.x), floor(self.position.y), floor(self.position.z))

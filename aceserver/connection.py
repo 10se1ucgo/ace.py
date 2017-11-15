@@ -238,9 +238,8 @@ class ServerConnection(base.BaseConnection):
             self.block.destroy()
 
         for ax, ay, az in to_destroy:
-            if not self.protocol.map.can_build(ax, ay, az):
-                continue
-            self.protocol.map.set_point(ax, ay, az, False)
+            if self.protocol.map.can_build(ax, ay, az):
+                self.protocol.map.set_point(ax, ay, az, False)
 
         block_action.player_id = self.id
         block_action.xyz = (x, y, z)
@@ -248,22 +247,21 @@ class ServerConnection(base.BaseConnection):
         await self.protocol.broadcast_loader(block_action)
         return True
 
-    async def build_block(self, x: int, y: int, z: int, color: Tuple[int, int, int]=None, force: bool=False) -> bool:
+    async def build_block(self, x: int, y: int, z: int, color: Tuple[int, int, int]=None) -> bool:
         if not self.protocol.map.can_build(x, y, z):
             return False
 
-        if not force and not self.block.build():
+        if not self.block.build():
             return False
 
         if color is not None:
             await self.block.set_color(*color)
 
-        if not force:
-            hook = await self.try_build_block(self, x, y, z)
-            if hook is False:
-                return False
-            if hook is not None:
-                x, y, z = hook
+        hook = await self.try_build_block(self, x, y, z)
+        if hook is False:
+            return False
+        if hook is not None:
+            x, y, z = hook
         r, g, b = self.block.color.rgb
         if self.protocol.map.set_point(x, y, z, True, (0x7F << 24) | r << 16 | g << 8 | b << 0):
             block_action.player_id = self.id
@@ -285,9 +283,8 @@ class ServerConnection(base.BaseConnection):
         position_data.data.xyz = x, y, z
         await self.send_loader(position_data)
 
-    async def restock(self, heal=True):
-        if heal:
-            await self.set_hp(100)
+    async def restock(self):
+        await self.set_hp(100)
         [tool.restock() for tool in self.tools]
         await self.send_loader(restock)
 
@@ -310,7 +307,7 @@ class ServerConnection(base.BaseConnection):
         return self.send_message(message, player_id=sender.id, chat_type=chat_type)
 
     def send_server_message(self, message: str):
-        return self.send_message("[SYSTEM]: " + message, chat_type=CHAT.SYSTEM)
+        return self.send_message("[*] " + message, chat_type=CHAT.SYSTEM)
 
     def send_hud_message(self, message: str):
         return self.send_message(message, chat_type=CHAT.BIG)
@@ -319,17 +316,25 @@ class ServerConnection(base.BaseConnection):
     async def recv_position_data(self, loader: packets.PositionData):
         if self.dead: return
 
-        pos: math3d.Vector3 = math3d.Vector3(loader.data.x, loader.data.y, loader.data.z)
+        x, y, z = loader.data.xyz
+        if util.bad_float(x, y, z):
+            return await self.disconnect()
+
+        pos: math3d.Vector3 = math3d.Vector3(x, y, z)
         if pos.sq_distance(self.wo.position) >= 3 ** 2:
             await self.set_position(reset=False)
         else:
-            self.wo.set_position(loader.data.x, loader.data.y, loader.data.z)
+            self.wo.set_position(x, y, z)
 
     @on_loader_receive(packets.OrientationData)
     async def recv_orientation_data(self, loader: packets.OrientationData):
         if self.dead: return
 
-        self.wo.set_orientation(*loader.data.xyz)
+        x, y, z = loader.data.xyz
+        if util.bad_float(x, y, z):
+            return await self.disconnect()
+
+        self.wo.set_orientation(x, y, z)
 
     @on_loader_receive(packets.InputData)
     async def recv_input_data(self, loader: packets.InputData):
@@ -432,19 +437,26 @@ class ServerConnection(base.BaseConnection):
         if self.dead:
             return
 
+        if util.bad_float(*loader.position.xyz, *loader.velocity.xyz, loader.value):
+            return await self.disconnect()
+
+        obj_type = None
         if loader.tool == TOOL.GRENADE:
             if self.tool_type != TOOL.GRENADE:
                 return
             if self.grenade.on_primary():
-                grenade: types.Grenade = \
-                    self.protocol.create_object(types.Grenade, self, loader.value, loader.position.xyz, loader.velocity.xyz)
-                await grenade.broadcast_grenade(lambda conn: conn != self)
+                obj_type = types.Grenade
         elif loader.tool == TOOL.RPG:
-            # not implemented
             if self.tool_type != TOOL.WEAPON or self.tool.type != WEAPON.RPG:
                 return
             if self.weapon.on_primary():
-                print("RPG")
+                obj_type = types.Rocket
+                # note: loader.velocity is actually orientation for RPG rockets.
+
+        if obj_type is not None:
+            obj: types.Explosive = \
+                self.protocol.create_object(obj_type, self, self.position.xyz, loader.velocity.xyz, loader.value)
+            await obj.broadcast_item(lambda conn: conn != self)
 
     @on_loader_receive(packets.HitPacket)
     async def recv_oriented_item(self, loader: packets.HitPacket):

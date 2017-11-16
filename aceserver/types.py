@@ -213,7 +213,7 @@ class Explosive:
                     damage = 100
                 else:
                     damage = 4096 / dist
-                await player.hurt(damage, KILL.GRENADE, self.thrower)
+                await player.hurt(damage, KILL.GRENADE, self.thrower, self.position.xyz)
         self.protocol.loop.create_task(self.on_explode(self))
         self.protocol.destroy_object(self)
 

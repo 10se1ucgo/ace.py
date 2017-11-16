@@ -199,18 +199,20 @@ class ServerConnection(base.BaseConnection):
         await self.spawn()
         self.store.pop("respawn_task")
 
-    async def hurt(self, damage: int, cause: KILL=KILL.FALL, damager=None):
-        reason = DAMAGE.SELF if damager is None else DAMAGE.OTHER
-        if isinstance(damager, ServerConnection):
-            pos = damager.position.xyz
-        else: # elif isinstance(damager, Grenade), etc..
-            pos = self.position.xyz
+    async def hurt(self, damage: int, cause: KILL=KILL.FALL, damager=None, source=(0, 0, 0)):
+        reason = DAMAGE.OTHER
+        if not source:
+            if damager is not None:
+                source = damager.position.xyz
+            else:
+                source = self.position.xyz
+                reason = DAMAGE.SELF
 
         hook = await self.try_player_hurt(self, damage, damager, cause)
         if hook is False:
             return
         damage = damage if hook is None else hook
-        await self.set_hp(self.hp - damage, reason, pos)
+        await self.set_hp(self.hp - damage, reason, source)
         if self.hp <= 0:
             await self.kill(cause, damager)
         else:
@@ -226,6 +228,12 @@ class ServerConnection(base.BaseConnection):
         await self.protocol.broadcast_loader(set_tool)
 
     async def destroy_block(self, x: int, y: int, z: int, destroy_type: ACTION=ACTION.DESTROY):
+        hook = await self.try_destroy_block(self, x, y, z, destroy_type)
+        if hook is False:
+            return False
+        if hook is not None:
+            x, y, z = hook
+
         to_destroy = [(x, y, z)]
         if destroy_type == ACTION.SPADE and self.tool_type == TOOL.SPADE:
             to_destroy.extend(((x, y, z - 1), (x, y, z + 1)))
@@ -245,6 +253,7 @@ class ServerConnection(base.BaseConnection):
         block_action.xyz = (x, y, z)
         block_action.value = destroy_type
         await self.protocol.broadcast_loader(block_action)
+        self.protocol.loop.create_task(self.on_destroy_block(self, x, y, z, destroy_type))
         return True
 
     async def build_block(self, x: int, y: int, z: int, color: Tuple[int, int, int]=None) -> bool:
@@ -268,7 +277,7 @@ class ServerConnection(base.BaseConnection):
             block_action.xyz = (x, y, z)
             block_action.value = ACTION.BUILD
             await self.protocol.broadcast_loader(block_action)
-            await self.on_build_block(self, x, y, z)
+            self.protocol.loop.create_task(self.on_build_block(self, x, y, z))
             return True
         return False
 
@@ -472,7 +481,15 @@ class ServerConnection(base.BaseConnection):
         other = self.protocol.players.get(loader.player_id)
         if other is None:
             return
-        await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
+
+        vec = (other.eye - self.eye)
+        vec.normalize()
+        if not self.orientation.equals(vec, tolerance=1):
+            print(f"self.pos={self.position} other.pos={other.position}")
+            print(f"self.orien={self.orientation} valid_orien={vec}")
+            return
+
+        # await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
 
     async def update(self, dt):
         if self.dead: return
@@ -503,6 +520,10 @@ class ServerConnection(base.BaseConnection):
     @property
     def position(self) -> math3d.Vector3:
         return self.wo.position
+
+    @property
+    def eye(self) -> math3d.Vector3:
+        return self.wo.eye
 
     @property
     def orientation(self) -> math3d.Vector3:
@@ -548,7 +569,10 @@ class ServerConnection(base.BaseConnection):
     # (self, x, y, z, destroy_type) -> None
     on_destroy_block = util.AsyncEvent()
 
+    # Called before/after the player sends a chat message
+    # (self, chat_message, chat_type) -> None | `chat_message` to override | False to cancel
     try_chat_message = util.AsyncEvent(overridable=True)
+    # (self, chat_message, chat_type) -> None
     on_chat_message = util.AsyncEvent()
 
     def __str__(self):

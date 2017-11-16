@@ -44,6 +44,7 @@ cdef class Player:
         self.position = math3d.new_proxy_vector(&self.ply.p)
         self.velocity = math3d.new_proxy_vector(&self.ply.v)
         self.orientation = math3d.new_proxy_vector(&self.ply.f)
+        self.eye = math3d.new_proxy_vector(&self.ply.e)
 
     def __init__(self, vxl.VXLMap map):
         pass

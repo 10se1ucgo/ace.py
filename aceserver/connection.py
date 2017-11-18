@@ -33,14 +33,13 @@ class ServerConnection(base.BaseConnection):
         self.name: str = "Deuce"
         self.hp = 100
         self.team: types.Team = None
+        self.kills: int = 0
 
         self.weapon = weapons.Weapon(self)
         self.block = weapons.Block(self)
         self.spade = weapons.Tool(self)
         self.grenade = weapons.Grenade(self)
         self.tool_type = TOOL.WEAPON
-
-        self.kills: int = 0
 
         self.wo: world.Player = world.Player(self.protocol.map)
         self.store = {}
@@ -167,7 +166,7 @@ class ServerConnection(base.BaseConnection):
         self.wo.set_dead(False)
         self.wo.set_position(*pos, reset=True)
         await self.restock()
-        await self.on_player_spawn(self, x, y, z)
+        self.protocol.loop.create_task(self.on_player_spawn(self, x, y, z))
 
     async def set_hp(self, hp: int, reason: DAMAGE=None, source: tuple=(0, 0, 0)):
         if reason is None:
@@ -193,6 +192,7 @@ class ServerConnection(base.BaseConnection):
         kill_action.respawn_time = respawn_time + 1
         await self.protocol.broadcast_loader(kill_action)
         self.store["respawn_task"] = self.protocol.loop.create_task(self.respawn(respawn_time))
+        self.protocol.loop.create_task(self.on_player_kill(self, kill_type, killer))
 
     async def respawn(self, respawn_time=0):
         await asyncio.sleep(respawn_time)
@@ -216,7 +216,7 @@ class ServerConnection(base.BaseConnection):
         if self.hp <= 0:
             await self.kill(cause, damager)
         else:
-            await self.on_player_hurt(self, damage, damager, reason)
+            self.protocol.loop.create_task(self.on_player_hurt(self, damage, damager, reason))
 
     async def set_tool(self, tool: TOOL):
         self.tool.set_primary(False)
@@ -391,7 +391,7 @@ class ServerConnection(base.BaseConnection):
             await self.team.broadcast_chat_message(message, sender=self)
         else:
             await self.protocol.broadcast_chat_message(message, sender=self)
-        await self.on_chat_message(self, loader.value, loader.chat_type)
+        self.protocol.loop.create_task(self.on_chat_message(self, loader.value, loader.chat_type))
 
         # chat_message.player_id = self.id
         # chat_message.chat_type = ChatType.ALL if loader.chat_type == ChatType.ALL else ChatType.TEAM
@@ -449,22 +449,28 @@ class ServerConnection(base.BaseConnection):
         if util.bad_float(*loader.position.xyz, *loader.velocity.xyz, loader.value):
             return await self.disconnect()
 
+        position = validate(math3d.Vector3(*loader.position.xyz), self.wo.position).xyz
+        velocity = loader.velocity.xyz
+
         obj_type = None
         if loader.tool == TOOL.GRENADE:
             if self.tool_type != TOOL.GRENADE:
                 return
             if self.grenade.on_primary():
                 obj_type = types.Grenade
+            print(self.wo.velocity + self.wo.orientation)
+            print(loader.velocity.xyz)
+            velocity = validate(math3d.Vector3(*velocity), self.wo.orientation + self.wo.velocity).xyz
         elif loader.tool == TOOL.RPG:
             if self.tool_type != TOOL.WEAPON or self.tool.type != WEAPON.RPG:
                 return
             if self.weapon.on_primary():
                 obj_type = types.Rocket
-                # note: loader.velocity is actually orientation for RPG rockets.
+            velocity = validate(math3d.Vector3(*velocity), self.wo.orientation).xyz
+            # note: loader.velocity is actually orientation for RPG rockets.
 
         if obj_type is not None:
-            obj: types.Explosive = \
-                self.protocol.create_object(obj_type, self, self.position.xyz, loader.velocity.xyz, loader.value)
+            obj: types.Explosive = self.protocol.create_object(obj_type, self, position, velocity, loader.value)
             await obj.broadcast_item(lambda conn: conn != self)
 
     @on_loader_receive(packets.HitPacket)
@@ -482,14 +488,12 @@ class ServerConnection(base.BaseConnection):
         if other is None:
             return
 
-        vec = (other.eye - self.eye)
-        vec.normalize()
-        if not self.orientation.equals(vec, tolerance=1):
+        if self.orientation.dot((other.eye - self.eye).normalized) <= 0.9:
             print(f"self.pos={self.position} other.pos={other.position}")
             print(f"self.orien={self.orientation} valid_orien={vec}")
             return
 
-        # await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
+        await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
 
     async def update(self, dt):
         if self.dead: return
@@ -502,7 +506,7 @@ class ServerConnection(base.BaseConnection):
     def to_existing_player(self) -> packets.ExistingPlayer:
         existing_player.name = self.name
         existing_player.player_id = self.id
-        existing_player.tool = self.tool_type or TOOL.WEAPON
+        existing_player.tool = self.tool_type
         existing_player.weapon = self.weapon.type
         existing_player.kills = self.kills
         existing_player.team = self.team.id
@@ -557,6 +561,10 @@ class ServerConnection(base.BaseConnection):
     # (self, damage, damager, position) -> None
     on_player_hurt = util.AsyncEvent()
 
+    # Called before/after the player dies
+    # (self, kill_type, killer) -> None
+    on_player_kill = util.AsyncEvent()
+
     # Called before/after the player builds
     # (self, x, y, z) -> None | `x, y, z` to override | False to cancel
     try_build_block = util.AsyncEvent(overridable=True)
@@ -580,3 +588,10 @@ class ServerConnection(base.BaseConnection):
 
     def __repr__(self):
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name}, pos={self.position}, tool={self.tool})>"
+
+
+def validate(vec1: math3d.Vector3, vec2: math3d.Vector3) -> math3d.Vector3:
+    if vec1.sq_distance(vec2) >= 3 ** 2:
+        return vec2
+    else:
+        return vec1

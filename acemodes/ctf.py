@@ -1,5 +1,6 @@
 from typing import *
 
+from acelib.constants import KILL
 from acelib.math3d import Vector3
 from acemodes import GameMode
 from aceserver import protocol, connection, types
@@ -29,6 +30,8 @@ class CTF(GameMode):
             await self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(team2), team=team2)
         self.cps = {self.team1_cp.team: self.team1_cp, self.team2_cp.team: self.team2_cp}
         types.CommandPost.on_collide += self.on_cp_collide
+
+        connection.ServerConnection.on_player_kill += self.on_player_kill
 
         self.pickup_sound = self.protocol.create_sound("pickup")
         self.capture_sound = self.protocol.create_sound("horn")
@@ -67,3 +70,10 @@ class CTF(GameMode):
     async def reset_intel(self, intel):
         await intel.set_carrier(None)
         await intel.set_position(*self.get_random_pos(intel.team))
+
+    async def on_player_kill(self, player: 'connection.ServerConnection', kill_type: KILL, killer: 'connection.ServerConnection'):
+        intel = self.intels[player.team.other]
+        if intel.carrier == player:
+            await intel.set_carrier(None)
+            await intel.set_position(*player.position.xyz)
+            await self.protocol.broadcast_hud_message(f"{player} dropped the {intel.team} Intel")

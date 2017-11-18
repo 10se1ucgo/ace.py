@@ -157,6 +157,12 @@ cdef class Vector3:
         return new_vector3_from(self.c_vec.min(other.c_vec[0]))
 
     @property
+    def normalized(self):
+        cdef Vector3 ret = new_vector3_from(self.c_vec[0])
+        ret.normalize()
+        return ret
+
+    @property
     def x(self):
         return self.c_vec.x
 
@@ -378,9 +384,7 @@ cdef class Matrix4x4:
 
     @staticmethod
     def rotate(double angle, Vector3 axis):
-        # todo: implement `normalized` property in Vector3 that auto copies for you.
-        cdef Vector3 v = axis.__copy__()
-        v.normalize()
+        cdef Vector3 v = axis.normalized
         cdef:
             double c = cos(angle)
             double s = sin(angle)

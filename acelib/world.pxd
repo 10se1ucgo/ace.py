@@ -46,7 +46,7 @@ cdef class WorldObject:
 cdef class Player:
     cdef AcePlayer *ply
     cdef public:
-        math3d.Vector3 position, velocity, orientation
+        math3d.Vector3 position, velocity, orientation, eye
 
 
 cdef class Grenade:

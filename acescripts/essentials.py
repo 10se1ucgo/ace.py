@@ -67,6 +67,16 @@ class EssentialsScript(Script):
             await self.protocol.create_entity(ent_type=type, position=pos, team=connection.team)
 
     @commands.command()
+    async def helicopter(self, connection: ServerConnection, x: float=None, y: float=None, z: float=None):
+        if x is None or y is None:
+            pos = connection.protocol.mode.get_random_pos(connection.team)
+        else:
+            if z is None:
+                z = self.protocol.map.get_z(x, y)
+            pos = (x, y, z)
+        await self.protocol.create_entity(ent_type=types.Helicopter, position=pos, team=None)
+
+    @commands.command()
     async def test_raycast(self, connection: ServerConnection):
         for x in range(10):
             pos = cast_ray(connection.protocol.map, connection.position, connection.orientation, length=256)
@@ -85,6 +95,7 @@ class EssentialsScript(Script):
     @commands.command()
     async def b(self, connection: ServerConnection, source: str):
         exec(source)
+
 
 def init(protocol: ServerProtocol, cfg: dict):
     return EssentialsScript(protocol, cfg)

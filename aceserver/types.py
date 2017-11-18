@@ -108,6 +108,8 @@ class Entity:
 
         if not self.carrier:
             for conn in self.protocol.players.values():
+                if conn.dead: continue
+
                 dist = self.position.sq_distance(conn.position)
                 if dist <= 3 ** 2:
                     self.protocol.loop.create_task(self.on_collide(self, conn))
@@ -162,7 +164,7 @@ class Entity:
         return self.__class__.__name__
 
     def __repr__(self):
-        return f"<Entity(id={self.id}, type={self.type!r}, pos={self.position})>"
+        return f"<Ent.{self.__class__.__name__}(id={self.id}, type={self.type!r}, pos={self.position})>"
 
 
 class Flag(Entity):

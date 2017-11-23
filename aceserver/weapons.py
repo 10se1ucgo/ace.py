@@ -107,7 +107,7 @@ class Weapon(Tool):
 
     def set_primary(self, primary: bool):
         # prevent server/client ammo desync (happens often :s not sure why)
-        if not primary:
+        if primary != self.primary and not primary and not self.one_by_one and not self.reloading:
             self.connection.protocol.loop.create_task(self.send_ammo())
 
         if self.primary_ammo <= 0:

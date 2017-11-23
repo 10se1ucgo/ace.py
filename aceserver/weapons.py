@@ -191,7 +191,7 @@ class Semi(Weapon):
     reload_time = 2.5
     one_by_one = False
 
-    damage = {HIT.TORSO: 49, HIT.HEAD: 100, HIT.ARMS: 33, HIT.LEGS: 33}
+    damage = {HIT.TORSO: 50, HIT.HEAD: 150, HIT.ARMS: 35, HIT.LEGS: 35}
     falloff = 0.03
 
 
@@ -207,7 +207,7 @@ class SMG(Weapon):
     reload_time = 2.5
     one_by_one = False
 
-    damage = {HIT.TORSO: 24, HIT.HEAD: 75, HIT.ARMS: 16, HIT.LEGS: 16}
+    damage = {HIT.TORSO: 30, HIT.HEAD: 80, HIT.ARMS: 20, HIT.LEGS: 20}
     falloff = 0.20
 
 
@@ -223,7 +223,7 @@ class Shotgun(Weapon):
     reload_time = 0.5
     one_by_one = True
 
-    damage = {HIT.TORSO: 21, HIT.HEAD: 24, HIT.ARMS: 14, HIT.LEGS: 14}
+    damage = {HIT.TORSO: 25, HIT.HEAD: 30, HIT.ARMS: 20, HIT.LEGS: 20}
     falloff = 0.40
 
 

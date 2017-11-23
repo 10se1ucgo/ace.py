@@ -1,5 +1,6 @@
 cimport cython
 from libc.stdint cimport *
+from libc.math cimport NAN, isnan
 from libcpp cimport bool
 
 from acelib.bytes cimport ByteReader, ByteWriter
@@ -874,6 +875,8 @@ cdef class ProgressBar(Loader):
 
     cpdef read(self, ByteReader reader):
         self.progress = reader.read_float()
+        if isnan(self.progress):
+            return
         self.rate = reader.read_float()
         self.color1.read(reader)
         self.color2.read(reader)
@@ -881,6 +884,8 @@ cdef class ProgressBar(Loader):
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
         writer.write_float(self.progress)
+        if isnan(self.progress):
+            return
         writer.write_float(self.rate)
         self.color1.write(writer)
         self.color2.write(writer)
@@ -889,9 +894,16 @@ cdef class ProgressBar(Loader):
         self.progress = progress
         self.rate = rate
 
-    def stop(self):
-        self.progress = float('nan')
-        self.rate = 0
+    @property
+    def stopped(self):
+        return isnan(self.progress)
+
+    @stopped.setter
+    def stopped(self, value):
+        if value:
+            self.progress = NAN
+        else:
+            self.progress = 0.0
 
 
 cdef class Restock(Loader):

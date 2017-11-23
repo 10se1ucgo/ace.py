@@ -2,11 +2,12 @@ import importlib
 from typing import Dict
 from collections import OrderedDict
 
+from aceserver import protocol
 
 class Script:
     def __init__(self, protocol, cfg):
-        self.protocol = protocol
-        self.cfg = cfg
+        self.protocol: 'protocol.ServerProtocol' = protocol
+        self.cfg: dict = cfg
 
     def deinit(self):
         pass

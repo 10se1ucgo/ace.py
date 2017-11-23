@@ -1,5 +1,5 @@
 import asyncio
-import sys
+import signal
 
 from aceserver import protocol
 
@@ -9,8 +9,17 @@ try:
 except ImportError:
     pass
 
-
 loop = asyncio.get_event_loop()
+loop.set_debug(True)
 server = protocol.ServerProtocol(loop)
-loop.run_until_complete(server.run())
-loop.close()
+try:
+    loop.add_signal_handler(signal.SIGINT, server.stop)
+    loop.add_signal_handler(signal.SIGTERM, server.stop)
+except NotImplementedError:
+    pass
+
+try:
+    loop.run_until_complete(server.run())
+finally:
+    server.stop()
+    loop.close()

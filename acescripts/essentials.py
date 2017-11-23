@@ -55,8 +55,7 @@ class EssentialsScript(Script):
         await connection.set_position(x, y)
 
     @commands.command()
-    async def crate(self, connection: ServerConnection, type: str, num: int=1, x: float=None, y: float=None, z: float=None):
-        type = types.HealthCrate if type.lower() == "health" else types.AmmoCrate
+    async def spawn(self, connection: ServerConnection, type: types.Entity, num: int=1, x: float=None, y: float=None, z: float=None):
         for j in range(num):
             if x is None or y is None:
                 pos = connection.protocol.mode.get_random_pos(connection.team)
@@ -67,23 +66,25 @@ class EssentialsScript(Script):
             await self.protocol.create_entity(ent_type=type, position=pos, team=connection.team)
 
     @commands.command()
-    async def helicopter(self, connection: ServerConnection, x: float=None, y: float=None, z: float=None):
-        if x is None or y is None:
-            pos = connection.protocol.mode.get_random_pos(connection.team)
-        else:
-            if z is None:
-                z = self.protocol.map.get_z(x, y)
-            pos = (x, y, z)
-        await self.protocol.create_entity(ent_type=types.Helicopter, position=pos, team=None)
-
-    @commands.command()
     async def test_raycast(self, connection: ServerConnection):
-        for x in range(10):
+        while True:
             pos = cast_ray(connection.protocol.map, connection.position, connection.orientation, length=256)
             if not pos:
-                return
+                continue
             await connection.destroy_block(*pos)
-            await asyncio.sleep(1)
+            await asyncio.sleep(1 / 10)
+
+    @commands.command()
+    async def grenade(self, connection: ServerConnection, x: float, y: float, z: float, a: float=0, b: float=0, c: float=0):
+        obj = self.protocol.create_object(types.Grenade, connection, (x, y, z), (a, b, c))
+        eta, pos = obj.next_collision(dt=1/60, max=20)
+        if eta is not False:
+            obj.fuse = eta
+        await obj.broadcast_item()
+
+    @commands.command()
+    async def fog(self, connection: ServerConnection, r: int, g: int, b: int):
+        await self.protocol.set_fog_color(r, g, b)
 
     @commands.command()
     async def a(self, connection: ServerConnection, source: str):

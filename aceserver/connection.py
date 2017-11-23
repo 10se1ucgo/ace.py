@@ -33,7 +33,7 @@ class ServerConnection(base.BaseConnection):
         self.name: str = "Deuce"
         self.hp = 100
         self.team: types.Team = None
-        self.kills: int = 0
+        self._score: int = 0
 
         self.weapon = weapons.Weapon(self)
         self.block = weapons.Block(self)
@@ -67,13 +67,16 @@ class ServerConnection(base.BaseConnection):
             return await self.disconnect()
         await self.received_loader(loader)
 
-    def send_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE):
-        writer: ByteWriter = loader.generate()
+    def _send_loader(self, writer: ByteWriter, flags=enet.PACKET_FLAG_RELIABLE):
         packet: enet.Packet = enet.Packet(bytes(writer), flags)
+        self.peer.send(0, packet)
+
+    def send_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE):
+
         # does this even DO anything?? enet just queues the packet for the next host_service call...
         # perhaps sending doesnt need to be coros, but receiving should.
         # please send help i have no clue what im doing
-        return self.protocol.loop.run_in_executor(None, self.peer.send, 0, packet)
+        return self.protocol.loop.run_in_executor(None, self._send_loader, loader.generate(), flags)
 
     async def disconnect(self, reason: DISCONNECT=DISCONNECT.UNDEFINED):
         self.peer.disconnect(reason)
@@ -174,23 +177,25 @@ class ServerConnection(base.BaseConnection):
                 reason = DAMAGE.HEAL
             else:
                 reason = DAMAGE.SELF
-        self.hp = max(0, min(int(hp), 100))
+        self.hp = max(0, min(int(hp), 255))
         set_hp.hp = self.hp
         set_hp.type = reason
         set_hp.source.xyz = source
         await self.send_loader(set_hp)
 
-    async def kill(self, kill_type: KILL=KILL.FALL, killer=None):
+    async def kill(self, kill_type: KILL=KILL.FALL, killer: 'ServerConnection'=None):
         if self.dead or self.store.get("respawn_task") is not None: return
 
         self.wo.set_dead(True)
 
         respawn_time = self.protocol.get_respawn_time()
+
         kill_action.player_id = self.id
         kill_action.killer_id = (killer or self).id
         kill_action.kill_type = kill_type
         kill_action.respawn_time = respawn_time + 1
         await self.protocol.broadcast_loader(kill_action)
+
         self.store["respawn_task"] = self.protocol.loop.create_task(self.respawn(respawn_time))
         self.protocol.loop.create_task(self.on_player_kill(self, kill_type, killer))
 
@@ -219,6 +224,9 @@ class ServerConnection(base.BaseConnection):
             self.protocol.loop.create_task(self.on_player_hurt(self, damage, damager, reason))
 
     async def set_tool(self, tool: TOOL):
+        if tool == self.tool_type:
+            return
+
         self.tool.set_primary(False)
         self.tool.set_secondary(False)
         self.tool_type = tool
@@ -352,7 +360,7 @@ class ServerConnection(base.BaseConnection):
         self.wo.set_walk(loader.up, loader.down, loader.left, loader.right)
         self.wo.set_animation(loader.jump, loader.crouch, loader.sneak, loader.sprint)
         loader.player_id = self.id
-        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn != self)
+        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
     @on_loader_receive(packets.ExistingPlayer)
     async def recv_existing_player(self, loader: packets.ExistingPlayer):
@@ -419,12 +427,15 @@ class ServerConnection(base.BaseConnection):
         loader.secondary = self.tool.set_secondary(loader.secondary)
         loader.player_id = self.id
         self.wo.set_fire(loader.primary, loader.secondary)
-        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn != self)
+        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
     @on_loader_receive(packets.WeaponReload)
     async def recv_weapon_reload(self, loader: packets.WeaponReload):
         if self.dead or self.tool_type != TOOL.WEAPON: return
-        await self.tool.reload()
+        reloading = self.tool.reload()
+        if reloading:
+            loader.player_id = self.id
+            await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
     @on_loader_receive(packets.SetTool)
     async def recv_set_tool(self, loader: packets.SetTool):
@@ -439,7 +450,7 @@ class ServerConnection(base.BaseConnection):
 
         self.color = loader.color.rgb
         loader.player_id = self.id
-        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn != self)
+        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
     @on_loader_receive(packets.UseOrientedItem)
     async def recv_oriented_item(self, loader: packets.UseOrientedItem):
@@ -471,7 +482,7 @@ class ServerConnection(base.BaseConnection):
 
         if obj_type is not None:
             obj: types.Explosive = self.protocol.create_object(obj_type, self, position, velocity, loader.value)
-            await obj.broadcast_item(lambda conn: conn != self)
+            await obj.broadcast_item(lambda conn: conn is not self)
 
     @on_loader_receive(packets.HitPacket)
     async def recv_oriented_item(self, loader: packets.HitPacket):
@@ -481,37 +492,52 @@ class ServerConnection(base.BaseConnection):
             return
 
         # TODO our own raycasting and hack detection etc.
-        damage = self.weapon.get_damage(loader.value)
-        if damage is None:
-            return
         other = self.protocol.players.get(loader.player_id)
         if other is None:
             return
 
-        if self.orientation.dot((other.eye - self.eye).normalized) <= 0.9:
+        vec = (other.eye - self.eye).normalized
+        if self.orientation.dot(vec) <= 0.9:
+            print("incorrect orientation to hit")
             print(f"self.pos={self.position} other.pos={other.position}")
-            print(f"self.orien={self.orientation} valid_orien={vec}")
+            print(f"self.orien={self.orientation} expected={vec}")
+            return
+
+        damage = self.weapon.get_damage(loader.value, other.position.distance(self.position))
+        if damage is None:
             return
 
         await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
 
-    async def update(self, dt):
+    def update(self, dt):
         if self.dead: return
 
         fall_dmg: int = self.wo.update(dt, self.protocol.time)
         if fall_dmg > 0:
-            await self.hurt(fall_dmg)
-        await self.tool.update(dt)
+            self.protocol.loop.create_task(self.hurt(fall_dmg))
+        self.tool.update(dt)
 
     def to_existing_player(self) -> packets.ExistingPlayer:
         existing_player.name = self.name
         existing_player.player_id = self.id
         existing_player.tool = self.tool_type
         existing_player.weapon = self.weapon.type
-        existing_player.kills = self.kills
+        existing_player.kills = self._score
         existing_player.team = self.team.id
         existing_player.color.rgb = self.block.color.rgb
         return existing_player
+
+    @property
+    def score(self):
+        return self._score
+
+    @score.setter
+    def score(self, value):
+        self._score = value
+        set_score.type = SCORE.PLAYER
+        set_score.specifier = self.id
+        set_score.value = self._score
+        self.protocol._broadcast_loader(set_score.generate())
 
     @property
     def tool(self) -> weapons.Tool:

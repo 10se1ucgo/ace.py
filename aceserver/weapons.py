@@ -26,7 +26,7 @@ class Tool:
         self.primary_ammo = self.max_primary
         self.secondary_ammo = self.max_secondary
 
-    async def update(self, dt: float):
+    def update(self, dt: float):
         if self.primary_rate:
             if self.primary_ammo > 0 and self.primary and self.connection.protocol.time >= self.next_primary:
                 self.next_primary = self.connection.protocol.time + self.primary_rate
@@ -51,7 +51,7 @@ class Tool:
     def on_secondary(self, *args, **kwargs):
         return True
 
-    async def reload(self, *args, **kwargs):
+    def reload(self, *args, **kwargs):
         return True
 
     def restock(self):
@@ -97,6 +97,7 @@ class Weapon(Tool):
     one_by_one = False
 
     damage = {HIT.TORSO: None, HIT.HEAD: None, HIT.ARMS: None, HIT.LEGS: None}
+    falloff = 0
 
     def __init__(self, connection: 'connection.ServerConnection'):
         super().__init__(connection)
@@ -105,7 +106,11 @@ class Weapon(Tool):
         self.reload_call: asyncio.Task = None
 
     def set_primary(self, primary: bool):
-        if (self.primary_ammo <= 0 or self.reloading) and not self.one_by_one:
+        # prevent server/client ammo desync (happens often :s not sure why)
+        if not primary:
+            self.connection.protocol.loop.create_task(self.send_ammo())
+
+        if self.primary_ammo <= 0:
             self.primary = False
             return False
         if primary and self.one_by_one and self.reloading:
@@ -115,10 +120,10 @@ class Weapon(Tool):
         return primary
 
     def set_secondary(self, secondary: bool):
-        self.secondary = False  # we dont care about secondary input on most weapons
-        return secondary # but we'll relay it to the client anyways
+        self.secondary = secondary
+        return secondary
 
-    async def reload(self):
+    def reload(self):
         if self.reloading:
             return False
         if not self.secondary_ammo or self.primary_ammo >= self.max_primary:
@@ -126,7 +131,6 @@ class Weapon(Tool):
             return False
 
         self.reloading = True
-        self.primary = False
 
         self.reload_call = asyncio.ensure_future(self.on_reload())
         return True
@@ -143,25 +147,30 @@ class Weapon(Tool):
             self.primary_ammo += 1
             self.secondary_ammo -= 1
             await self.send_ammo()
-            await self.reload()
+            self.reload()
 
     def on_primary(self):
+        if self.reloading:
+            return False
         if self.primary_ammo <= 0:
             return False
         self.primary_ammo -= 1
-        print("SHOOT", self.primary_ammo)
         return True
 
     def on_secondary(self):
         pass
 
-    def get_damage(self, value):
+    def get_damage(self, area, distance=0):
         if not self.primary or self.reloading:
             return None
         clip_tolerance = int(self.max_primary * 0.3)
         if self.primary_ammo + clip_tolerance <= 0:
             return None
-        return self.damage[value]
+
+        damage = self.damage[area]
+        if damage is not None:
+            damage *= (1 - min(self.falloff * distance / 30, 1))
+        return damage
 
     async def send_ammo(self):
         loaders.weapon_reload.player_id = self.connection.id
@@ -183,6 +192,7 @@ class Semi(Weapon):
     one_by_one = False
 
     damage = {HIT.TORSO: 49, HIT.HEAD: 100, HIT.ARMS: 33, HIT.LEGS: 33}
+    falloff = 0.03
 
 
 class SMG(Weapon):
@@ -198,6 +208,7 @@ class SMG(Weapon):
     one_by_one = False
 
     damage = {HIT.TORSO: 24, HIT.HEAD: 75, HIT.ARMS: 16, HIT.LEGS: 16}
+    falloff = 0.20
 
 
 class Shotgun(Weapon):
@@ -213,6 +224,7 @@ class Shotgun(Weapon):
     one_by_one = True
 
     damage = {HIT.TORSO: 21, HIT.HEAD: 24, HIT.ARMS: 14, HIT.LEGS: 14}
+    falloff = 0.40
 
 
 class RPG(Weapon):
@@ -228,8 +240,9 @@ class RPG(Weapon):
     one_by_one = False
 
     damage = {HIT.TORSO: None, HIT.HEAD: None, HIT.ARMS: None, HIT.LEGS: None}
+    falloff = 0
 
-    async def update(self, dt):
+    def update(self, dt):
         pass
 
 

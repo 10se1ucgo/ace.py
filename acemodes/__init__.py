@@ -36,7 +36,11 @@ class GameMode:
         crate.destroy()
 
     async def on_player_kill(self, player: 'connection.ServerConnection', kill_type: constants.KILL, killer: 'connection.ServerConnection'):
-        killer.score += 1
+        if killer is player:
+            # suicide
+            killer.score -= 1
+        else:
+            killer.score += 1
 
     def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[int, int, int]:
         x, y ,z = self.get_random_pos(player.team)

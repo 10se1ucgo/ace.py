@@ -30,10 +30,10 @@ class ServerConnection(base.BaseConnection):
         self.peer = peer
 
         self.id: int = None
-        self.name: str = "Deuce"
+        self.name = "Deuce"
         self.hp = 100
         self.team: types.Team = None
-        self._score: int = 0
+        self._score = 0
 
         self.weapon = weapons.Weapon(self)
         self.block = weapons.Block(self)
@@ -41,7 +41,7 @@ class ServerConnection(base.BaseConnection):
         self.grenade = weapons.Grenade(self)
         self.tool_type = TOOL.WEAPON
 
-        self.wo: world.Player = world.Player(self.protocol.map)
+        self.wo: world.Player = None
         self.store = {}
 
         self._listeners: Dict[int, List[asyncio.Future]] = defaultdict(list)
@@ -80,6 +80,13 @@ class ServerConnection(base.BaseConnection):
 
     async def disconnect(self, reason: DISCONNECT=DISCONNECT.UNDEFINED):
         self.peer.disconnect(reason)
+
+    def reset(self):
+        self.wo = None
+        respawn_task = self.store["respawn_task"]
+        if respawn_task is not None:
+            respawn_task.cancel()
+
 
     async def received_loader(self, loader: packets.Loader):
         if self.id is None:
@@ -166,6 +173,9 @@ class ServerConnection(base.BaseConnection):
         create_player.team = self.team.id
         await self.protocol.broadcast_loader(create_player)
 
+        if self.wo is None:
+            self.wo = world.Player(self.protocol.map)
+
         self.wo.set_dead(False)
         self.wo.set_position(*pos, reset=True)
         await self.restock()
@@ -212,6 +222,7 @@ class ServerConnection(base.BaseConnection):
             else:
                 source = self.position.xyz
                 reason = DAMAGE.SELF
+        damager = damager or self
 
         hook = await self.try_player_hurt(self, damage, damager, cause)
         if hook is False:
@@ -533,7 +544,7 @@ class ServerConnection(base.BaseConnection):
 
     @score.setter
     def score(self, value):
-        self._score = value
+        self._score = max(0, min(int(self._score), 255))
         set_score.type = SCORE.PLAYER
         set_score.specifier = self.id
         set_score.value = self._score
@@ -561,7 +572,7 @@ class ServerConnection(base.BaseConnection):
 
     @property
     def dead(self) -> bool:
-        return self.wo.dead
+        return not self.wo or self.wo.dead
 
 
     # TODO more hooks

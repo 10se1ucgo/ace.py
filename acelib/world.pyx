@@ -62,6 +62,8 @@ cdef class Player:
         self.ply.crouch = value
 
     def set_animation(self, bint jump, bint crouch, bint sneak, bint sprint):
+        if self.ply.airborne:
+            jump = False
         self.ply.jump = jump
         self.set_crouch(crouch)
         self.ply.sneak = sneak
@@ -94,8 +96,75 @@ cdef class Player:
         self.ply.alive = not dead
 
     @property
+    def mf(self):
+        return self.ply.mf
+    @mf.setter
+    def mf(self, value):
+        self.ply.mf = value
+
+    @property
+    def mb(self):
+        return self.ply.mb
+    @mb.setter
+    def mb(self, value):
+        self.ply.mb = value
+
+    @property
+    def ml(self):
+        return self.ply.ml
+    @ml.setter
+    def ml(self, value):
+        self.ply.ml = value
+
+    @property
+    def mr(self):
+        return self.ply.mr
+    @mr.setter
+    def mr(self, value):
+        self.ply.mr = value
+
+    @property
+    def jump(self):
+        return self.ply.jump
+    @jump.setter
+    def jump(self, value):
+        self.ply.jump = value
+
+    @property
+    def crouch(self):
+        return self.ply.crouch
+    @crouch.setter
+    def crouch(self, value):
+        self.set_crouch(value)
+
+    @property
+    def sneak(self):
+        return self.ply.sneak
+    @sneak.setter
+    def sneak(self, value):
+        self.ply.sneak = value
+
+    @property
+    def sprint(self):
+        return self.ply.sneak
+    @sprint.setter
+    def sprint(self, value):
+        self.ply.sprint = value
+
+    @property
+    def airborne(self):
+        return self.ply.airborne
+
+    @property
+    def wade(self):
+        return self.ply.wade
+
+    @property
     def dead(self):
         return not self.ply.alive
+    @dead.setter
+    def dead(self, bint val):
+        self.ply.alive = not val
 
     def set_orientation(self, double x, double y, double z):
         self.ply.set_orientation(x, y, z)

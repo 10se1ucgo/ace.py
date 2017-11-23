@@ -78,7 +78,7 @@ class ServerProtocol(base.BaseProtocol):
     def world_update(self):
         world_update.clear()
         for conn in self.players.values():
-            if not conn.name:
+            if not conn.name or conn.dead:
                 continue
             world_update[conn.id] = (conn.position.xyz, conn.orientation)
         self._broadcast_loader(world_update.generate(), flags=enet.PACKET_FLAG_UNSEQUENCED)

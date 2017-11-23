@@ -111,7 +111,7 @@ T Vector3<T>::dot(const Vector3<T> &other) const {
 
 template<typename T>
 double Vector3<T>::angle(const Vector3<T> &other, bool deg) const {
-    double x = std::acos(detail::clamp(this->dot(other), 1.0, -1.0));
+    double x = std::acos(detail::clamp<T>(this->dot(other), 1.0, -1.0));
     return deg ? x * (180.0 / detail::PI) : x;
 }
 

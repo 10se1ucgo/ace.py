@@ -49,12 +49,13 @@ class Event:
         return self
 
     def __call__(self, *args, **kwargs):
+        dirty = False
         for ref in self._funcs:
+            func = ref()
+            if func is None:
+                dirty = True
+                continue
             try:
-                func = ref()
-                if func is None:
-                    self._funcs.remove(ref)
-                    continue
                 r = func(*args, **kwargs)
             except Exception:
                 print(f"Ignoring exception in event hook {func}")
@@ -62,6 +63,16 @@ class Event:
                 continue
             if self.overridable and r is not None:
                 return r
+        if dirty:
+            self.flush()
+
+    def __bool__(self):
+        self.flush()
+        return bool(self._funcs)
+
+    def flush(self):
+        self._funcs = [ref for ref in self._funcs if ref() is not None]
+
 
 class AsyncEvent(Event):
     def __iadd__(self, other):
@@ -69,13 +80,15 @@ class AsyncEvent(Event):
             raise TypeError("Event handler must be a coroutine.")
         return super().__iadd__(other)
 
+    # todo this is literally the same as Event.__call__ except with async and await isntead. Is there a better way?
     async def __call__(self, *args, **kwargs):
+        dirty = False
         for ref in self._funcs:
+            func = ref()
+            if func is None:
+                dirty = True
+                continue
             try:
-                func = ref()
-                if func is None:
-                    self._funcs.remove(ref)
-                    continue
                 r = await func(*args, **kwargs)
             except Exception:
                 print(f"Ignoring exception in event hook {func}")
@@ -83,6 +96,8 @@ class AsyncEvent(Event):
                 continue
             if self.overridable and r is not None:
                 return r
+        if dirty:
+            self.flush()
 
 
 def static_vars(**kwargs):

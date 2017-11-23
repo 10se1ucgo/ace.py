@@ -912,14 +912,19 @@ cdef class FogColor(Loader):
     id: int = 31
 
     cdef public:
-        uint32_t color
+        Color color
+
+    def __cinit__(self):
+        self.color = Color()
 
     cpdef read(self, ByteReader reader):
-        self.color = reader.read_uint32()
+        reader.read_uint8()
+        self.color.read(reader)
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
-        writer.write_uint32(self.color)
+        writer.write_uint8(0xFF)
+        self.color.write(writer)
 
 
 cdef class WeaponReload(Loader):

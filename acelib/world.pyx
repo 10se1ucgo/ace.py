@@ -119,6 +119,16 @@ cdef class Grenade:
     def update(self, double dt, double time):
         return self.grenade.update(dt, time)
 
+    def next_collision(self, double dt, double max):
+        cdef:
+            double eta
+            math3d.Vector3 pos = math3d.new_vector3(0, 0, 0)
+        collides = self.grenade.next_collision(dt, max, &eta, pos.c_vec)
+        if collides:
+            return eta, pos
+        else:
+            return False, pos
+
 
 # A generic object with collision detection
 cdef class GenericMovement:

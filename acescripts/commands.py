@@ -9,9 +9,10 @@ import inspect
 import traceback
 from typing import Dict, Callable
 
-from acelib.constants import CHAT
+from acelib.constants import CHAT, ENTITY
 from aceserver.protocol import ServerProtocol
 from aceserver.connection import ServerConnection
+from aceserver.types import Entity, ENTITIES
 from acescripts import Script
 
 
@@ -65,7 +66,7 @@ class Command:
                         arg = param_type(arg)
                 except (TypeError, ValueError):
                     raise IncorrectParameters(
-                        f'Unable to convert argument {param_name} "{msg[x]}" to "{param_type}" in command {self.name}'
+                        f'Unable to convert argument `{param_name}` "{msg[x]}" to "{param_type}" in command {self.name}'
                     )
             args.append(arg)
 
@@ -104,7 +105,7 @@ class CommandsScript(Script):
         command_name = fragments[0]
         command = self.commands.get(command_name)
         if not command:
-            return
+            return False
 
         try:
             await command(connection, fragments[1:])
@@ -128,6 +129,19 @@ def to_connection(conn: ServerConnection, parameter: str) -> ServerConnection:
     if not ply:
         ply = conn.protocol.players.get(int(parameter.lstrip("#")))
     return ply
+
+
+@register_converter(Entity)
+def to_entity(conn: ServerConnection, parameter: str) -> ServerConnection:
+    try:
+        try:
+            type = ENTITY[parameter.upper()]
+        except KeyError:
+            type = ENTITY(int(parameter))
+        return ENTITIES.get(type)
+    except ValueError:
+        names = {cls.__name__.lower(): cls for cls in ENTITIES.values()}
+        return names.get(parameter.lower())
 
 
 # TODO permissions

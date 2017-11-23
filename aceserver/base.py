@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 import typing
+import time as t
 
 import enet
 
@@ -18,7 +19,6 @@ class BaseConnection:
         pass
 
 
-
 class BaseProtocol:
     def __init__(self, loop: asyncio.AbstractEventLoop, interface: str=None, port: int=32887, max_connections: int=32,
                  connection_factory=BaseConnection):
@@ -27,8 +27,10 @@ class BaseProtocol:
         self.host.compress_with_range_coder()
         self.connection_factory = connection_factory
 
-        self.connections: typing.Dict[enet.Peer, BaseConnection] = {}
+        self.connections: typing.Dict[enet.Peer, connection_factory] = {}
+
         self.time = 0
+        self.running = True
 
     async def run(self):
         ip, port = util.get_ip(), self.host.address.port
@@ -36,53 +38,52 @@ class BaseProtocol:
         print(f"Server identifier is {util.get_identifier(ip, port)}")
 
         # start = self.loop.time()
-        last: float = self.loop.time()
-        self.loop.create_task(self.net_update())
-        while self.loop.is_running():
-            now = self.loop.time()
+        last: float = t.perf_counter()
+        while self.running:
+            now = t.perf_counter()
             dt = now - last
             self.time += dt
-            await self.update(dt)
-            # await asyncio.sleep(1 / 64)
+            try:
+                self.update(dt)
+            except Exception:
+                print("Ignoring exception in update(): ")
+                traceback.print_exc()
+            await asyncio.sleep(0)
             # print(self.time, 1 / (dt or 1))
             last = now
 
     def stop(self):
+        self.running = False
         print("Shutting down...")
         for conn in self.connections:
             conn.disconnect()
         print("Disconnected clients")
         self.host.flush()
         print("Flushed host")
-        self.loop.stop()
 
-    async def update(self, dt):
-        pass # await self.net_update(dt)
+    def update(self, dt):
+        self.net_update()
 
-    # def net_loop(self):
-    #     while True:
-    #         self.net()
-
-    async def net_update(self):
+    def net_update(self):
         while True:
             try:
                 if self.host is None:
-                    return
-                event = await self.loop.run_in_executor(None, self.host.service, 0)
+                    break
+                event = self.host.service(0)
                 event_type = event.type
                 if not event or event_type == enet.EVENT_TYPE_NONE:
-                    continue
+                    break
 
                 peer = event.peer
-                future = None
+                task = None
                 if event_type == enet.EVENT_TYPE_CONNECT:
-                    future = asyncio.ensure_future(self.on_connect(peer, event.data), loop=self.loop)
+                    task = self.loop.create_task(self.on_connect(peer, event.data))
                 elif event_type == enet.EVENT_TYPE_DISCONNECT:
-                    future = asyncio.ensure_future(self.on_disconnect(peer), loop=self.loop)
+                    task = self.loop.create_task(self.on_disconnect(peer))
                 elif event_type == enet.EVENT_TYPE_RECEIVE:
-                    future = asyncio.ensure_future(self.on_receive(peer, event.packet), loop=self.loop)
-                if future:
-                    future.add_done_callback(net_finish)
+                    task = self.loop.create_task(self.on_receive(peer, event.packet))
+                if task:
+                    task.add_done_callback(net_finish)
             except:
                 print("Ignoring exception in net_loop(): ")
                 traceback.print_exc()

@@ -24,8 +24,8 @@ class Sound:
         stop_sound.loop_id = self.id
         await self.protocol.broadcast_loader(stop_sound, predicate=predicate)
 
-    async def destroy(self):
-        await self.stop()
+    def destroy(self):
+        self.protocol.loop.create_task(self.stop())
         self.protocol.destroy_sound(self)
 
     def to_play_sound(self):
@@ -36,18 +36,18 @@ class Sound:
         play_sound.position.xyz = self.position or (0, 0, 0)
         return play_sound
 
-class Team(object):
-    def __init__(self, team_id: TEAM, name: str, color: tuple, spectator: bool, protocol: 'protocol.ServerProtocol'):
+
+class Team:
+    def __init__(self, protocol: 'protocol.ServerProtocol', team_id: TEAM, name: str, color: tuple, spectator: bool=False):
+        self.protocol = protocol
         self.id = team_id
         self.name = name
         self.color = color
         self.spectator = spectator
-        self.protocol = protocol
 
         self.other: 'Team' = None
 
-        self.score = 0
-        self.kills = 0
+        self._score = 0
 
     def players(self) -> Generator['connection.ServerConnection', None, None]:
         for conn in self.protocol.players.values():
@@ -59,14 +59,6 @@ class Team(object):
             if ent.team == self:
                 yield ent
 
-    async def set_score(self, new_score=None):
-        if new_score is not None:
-            self.score = new_score
-        loaders.set_score.type = SCORE.TEAM
-        loaders.set_score.specifier = self.id
-        loaders.set_score.value = self.score
-        await self.protocol.broadcast_loader(loaders.set_score)
-
     def broadcast_chat_message(self, message: str, sender: 'connection.ServerConnection'):
         return self.protocol.broadcast_chat_message(message, sender, team=self)
 
@@ -75,6 +67,18 @@ class Team(object):
 
     def broadcast_hud_message(self, message: str):
         return self.protocol.broadcast_hud_message(message, team=self)
+
+    @property
+    def score(self):
+        return self._score
+
+    @score.setter
+    def score(self, value):
+        self._score = value
+        loaders.set_score.type = SCORE.TEAM
+        loaders.set_score.specifier = self.id
+        loaders.set_score.value = self._score
+        self.protocol._broadcast_loader(loaders.set_score.generate())
 
     def __str__(self):
         return f"{self.name} team"
@@ -98,15 +102,20 @@ class Entity:
 
         self.destroyed = False
 
-    async def update(self, dt):
+    def update(self, dt):
         if self.destroyed:
             return
 
+        self.do_gravity()
+        self.do_collide()
+
+    def do_gravity(self):
         z = self.protocol.map.get_z(self.position.x, self.position.y, self.position.z - 1)
         if z != self.position.z:
-            await self.set_position(self.position.x, self.position.y, z)
+            self.protocol.loop.create_task(self.set_position(self.position.x, self.position.y, z))
 
-        if not self.carrier:
+    def do_collide(self):
+        if not self.carrier and self.on_collide:
             for conn in self.protocol.players.values():
                 if conn.dead: continue
 
@@ -143,11 +152,11 @@ class Entity:
         change_entity.carrier = player
         await self.protocol.broadcast_loader(change_entity)
 
-    async def destroy(self):
+    def destroy(self):
         if self.destroyed:
             return
-        await self.protocol.destroy_entity(self)
         self.destroyed = True
+        self.protocol.loop.create_task(self.protocol.destroy_entity(self))
 
     def to_loader(self):
         if self.destroyed:
@@ -192,6 +201,9 @@ class CommandPost(Entity):
     on_collide = util.AsyncEvent()
 
 
+ENTITIES = {cls.type: cls for cls in Entity.__subclasses__()}
+
+
 class Explosive:
     on_throw = util.AsyncEvent()
     on_explode = util.AsyncEvent()
@@ -200,9 +212,10 @@ class Explosive:
         self.protocol = protocol
         self.wo = world_object
         self.thrower = thrower
+        self.destroyed = False
         self.protocol.loop.create_task(self.on_throw(self))
 
-    async def update(self, dt):
+    def update(self, dt):
         pass
 
     async def explode(self):
@@ -217,13 +230,16 @@ class Explosive:
                     damage = 4096 / dist
                 await player.hurt(damage, KILL.GRENADE, self.thrower, self.position.xyz)
         self.protocol.loop.create_task(self.on_explode(self))
-        self.protocol.destroy_object(self)
 
     async def broadcast_item(self, predicate=None):
         raise NotImplementedError
 
     def hit_test(self, player: 'connection.ServerConnection'):
         return not world.cast_ray(self.protocol.map, player.position, self.wo.position, isdirection=False)
+
+    def destroy(self):
+        self.destroyed = True
+        self.protocol.destroy_object(self)
 
     @property
     def position(self) -> math3d.Vector3:
@@ -235,25 +251,40 @@ class Grenade(Explosive):
     on_collide = util.AsyncEvent()
     on_explode = util.AsyncEvent()
 
-    def __init__(self, protocol: 'protocol.ServerProtocol', thrower: 'connection.ServerConnection', position, velocity, fuse):
+    def __init__(self, protocol: 'protocol.ServerProtocol', thrower: 'connection.ServerConnection', position, velocity, fuse=5):
         self.wo = world.Grenade(protocol.map, *position, *velocity)
         super().__init__(protocol, self.wo, thrower)
 
-        self.explode_time = self.protocol.time + fuse
+        self.start_time = self.protocol.time
+        self.explode_time = self.start_time + fuse
 
-    async def update(self, dt):
+    def update(self, dt):
+        if self.destroyed: return
+
         bounced = self.wo.update(dt, self.protocol.time)
         if bounced:
             self.protocol.loop.create_task(self.on_collide(self))
         if self.protocol.time >= self.explode_time:
-            await self.explode()
+            self.destroy()
+            self.protocol.loop.create_task(self.explode())
+
+    def next_collision(self, dt: float, max: float=5):
+        return self.wo.next_collision(dt, max)
 
     async def broadcast_item(self, predicate=None):
         grenade_packet.player_id = self.thrower.id
-        grenade_packet.value = self.explode_time - self.protocol.time
+        grenade_packet.value = self.fuse
         grenade_packet.position.xyz = self.wo.position.xyz
         grenade_packet.velocity.xyz = self.wo.velocity.xyz
         await self.protocol.broadcast_loader(grenade_packet, predicate=predicate)
+
+    @property
+    def fuse(self):
+        return self.explode_time - self.protocol.time
+
+    @fuse.setter
+    def fuse(self, value):
+        self.explode_time = self.start_time + value
 
 
 class Rocket(Explosive):
@@ -266,10 +297,12 @@ class Rocket(Explosive):
 
         # i dont know math so im going to try my best to replicate the client
         self.pitch = self.yaw = 0
-        self.yawmat = math3d.Matrix4x4()
+        self.yawmat = None
         self.set_orientation(*orientation)
 
-    async def update(self, dt):
+    def update(self, dt):
+        if self.destroyed: return
+
         b = math3d.Matrix4x4.rotate(self.pitch, math3d.Vector3(-1, 0, 0))
         rotation = b * self.yawmat
 
@@ -284,7 +317,8 @@ class Rocket(Explosive):
 
         bounced = self.wo.update(dt, self.protocol.time)
         if bounced:
-            await self.explode()
+            self.destroy()
+            self.protocol.loop.create_task(self.explode())
 
         self.pitch += math.radians(ROCKET_FALLOFF) * dt
 

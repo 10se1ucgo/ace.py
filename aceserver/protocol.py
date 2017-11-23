@@ -35,8 +35,8 @@ class ServerProtocol(base.BaseProtocol):
         self.entity_ids = util.IDPool(stop=255)
         self.sound_ids = util.IDPool(stop=255)
 
-        self.team1 = types.Team(TEAM.TEAM1, "Blue", (44, 117, 179), False, self)
-        self.team2 = types.Team(TEAM.TEAM2, "Green", (137, 179, 44), False, self)
+        self.team1 = types.Team(self, TEAM.TEAM1, "Blue", (44, 117, 179))
+        self.team2 = types.Team(self, TEAM.TEAM2, "Green", (137, 179, 44))
         self.team1.other = self.team2
         self.team2.other = self.team1
         self.teams = {self.team1.id: self.team1, self.team2.id: self.team2}
@@ -64,34 +64,40 @@ class ServerProtocol(base.BaseProtocol):
         print("Unloaded scripts")
         super().stop()
 
-    async def update(self, dt):
-        await super().update(dt)
-        ent_updates = {ent.update(dt) for ent in self.entities.values()}
-        ply_updates = {ply.update(dt) for ply in self.players.values()}
-        obj_updates = {obj.update(dt) for obj in self.objects}
-        await asyncio.wait(ent_updates | ply_updates | obj_updates | {self.mode.update(dt)})
-        await self.world_update()
+    def update(self, dt):
+        super().update(dt)
+        for ent in self.entities.values():
+            ent.update(dt)
+        for ply in self.players.values():
+            ply.update(dt)
+        for obj in self.objects:
+            obj.update(dt)
+        self.mode.update(dt)
+        self.world_update()
 
-    async def world_update(self):
+    def world_update(self):
         world_update.clear()
         for conn in self.players.values():
             if not conn.name:
                 continue
             world_update[conn.id] = (conn.position.xyz, conn.orientation)
-        await self.broadcast_loader(world_update, flags=enet.PACKET_FLAG_UNSEQUENCED)
+        self._broadcast_loader(world_update.generate(), flags=enet.PACKET_FLAG_UNSEQUENCED)
 
-    async def broadcast_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE, *, predicate=None):
-        writer: ByteWriter = loader.generate()
+    def _broadcast_loader(self, writer: ByteWriter, flags=enet.PACKET_FLAG_RELIABLE, predicate=None):
         packet: enet.Packet = enet.Packet(bytes(writer), flags)
 
         if not callable(predicate):
-            return await self.loop.run_in_executor(None, self.host.broadcast, 0, packet)
+            return self.host.broadcast(0, packet)
 
         for conn in self.connections.values():
             if predicate(conn):
-                await conn.send_loader(loader, flags)
+                conn.peer.send(0, packet)
 
-    def create_object(self, obj_type, *args, **kwargs):
+    def broadcast_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE, *, predicate=None):
+        return self.loop.run_in_executor(None, self._broadcast_loader, loader.generate(), flags, predicate)
+
+    TObj = TypeVar('TObj')
+    def create_object(self, obj_type: Type[TObj], *args, **kwargs) -> TObj:
         obj = obj_type(self, *args, **kwargs)
         self.objects.append(obj)
         return obj
@@ -99,8 +105,9 @@ class ServerProtocol(base.BaseProtocol):
     def destroy_object(self, obj):
         self.objects.remove(obj)
 
-    async def create_entity(self, ent_type: Type[types.Entity], **kwargs):
-        ent = ent_type(self.entity_ids.pop(), self, **kwargs)
+    TEnt = TypeVar('TEnt')
+    async def create_entity(self, ent_type: Type[TEnt], *args, **kwargs) -> TEnt:
+        ent = ent_type(self.entity_ids.pop(), self, *args, **kwargs)
         self.entities[ent.id] = ent
         create_entity.entity = ent.to_loader()
         await self.broadcast_loader(create_entity)
@@ -139,18 +146,26 @@ class ServerProtocol(base.BaseProtocol):
             chat_message.value = line
             await self.broadcast_loader(chat_message, predicate=predicate)
 
-    def broadcast_chat_message(self, message: str, sender: connection.ServerConnection, team: types.Team =None):
+    def broadcast_chat_message(self, message: str, sender: connection.ServerConnection, team: types.Team=None):
         predicate = (lambda conn: conn.team == team) if team else None
         chat_type = CHAT.TEAM if team else CHAT.ALL
         return self.broadcast_message(message, player_id=sender.id, chat_type=chat_type, predicate=predicate)
 
-    def broadcast_server_message(self, message: str, team: types.Team =None):
+    def broadcast_server_message(self, message: str, team: types.Team=None):
         predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=CHAT.BIG, predicate=predicate)
 
     def broadcast_hud_message(self, message: str, team: types.Team =None):
         predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=CHAT.BIG, predicate=predicate)
+
+    def set_fog_color(self, r, g, b):
+        r &= 255
+        g &= 255
+        b &= 255
+        self.fog_color = (r, g, b)
+        fog_color.color.rgb = r, g, b
+        return self.broadcast_loader(fog_color)
 
     async def player_joined(self, conn: 'connection.ServerConnection'):
         print(f"player join {conn.id}")

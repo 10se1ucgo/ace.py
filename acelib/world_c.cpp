@@ -42,6 +42,7 @@ struct AceGrenade {
     AceGrenade(AceMap *map, double px, double py, double pz, double vx, double vy, double vz) : map(map), p(px, py, pz), v(vx, vy, vz) {
     }
     bool update(double dt, double time);
+    bool next_collision(double dt, double max, double *eta, Vector *pos);
 
     AceMap *map;
     Vector p, v;
@@ -290,6 +291,23 @@ bool AceGrenade::update(double dt, double time) {
         return true;
     }
     return false;
+}
+
+bool AceGrenade::next_collision(double dt, double max, double *eta, Vector *pos) {
+    const Vector op = this->p;
+    const Vector ov = this->v;
+    bool collide = false;
+    for(*eta = 0.0; *eta < max; *eta += dt) {
+        if(this->update(dt, 0)) {
+            collide = true;
+            break;
+        }
+    }
+    pos->set(this->p.x, this->p.y, this->p.z);
+    this->p = op;
+    this->v = ov;
+    if (!collide) *eta = max;
+    return collide;
 }
 
 bool cast_ray(AceMap *map, const Vector &position, const Vector &direction, long *x, long *y, long *z, float length=32, bool isdirection=true) {

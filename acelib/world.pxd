@@ -17,6 +17,7 @@ cdef extern from "world_c.cpp" nogil:
         AceGrenade(vxl.AceMap *map, math3d_c.Vector3[double] position, math3d_c.Vector3[double] velocity) except +
         AceGrenade(vxl.AceMap *map, double px, double py, double pz, double vx, double vy, double vz) except +
         bool update(double dt, double time)
+        bool next_collision(double dt, double max, double *eta, math3d_c.Vector3[double] *pos)
 
         vxl.AceMap *map
         math3d_c.Vector3[double] p, v

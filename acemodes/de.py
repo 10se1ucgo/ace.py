@@ -43,9 +43,9 @@ class Defusal(GameMode):
         self.c4plant = self.protocol.create_sound("c4plant")
 
     async def deinit(self):
-        await self.bomb.destroy()
-        await self.bombsite_a.destroy()
-        await self.bombsite_b.destroy()
+        self.bomb.destroy()
+        self.bombsite_a.destroy()
+        self.bombsite_b.destroy()
 
     async def on_pickup_bomb(self, bomb: C4, player: 'connection.ServerConnection'):
         if bomb is not self.bomb: return

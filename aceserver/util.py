@@ -34,9 +34,11 @@ class Event:
         if not callable(other):
             raise TypeError("Event handler must be callable.")
         if inspect.ismethod(other):
-            self._funcs.append(weakref.WeakMethod(other))
+            ref = weakref.WeakMethod(other)
         else:
-            self._funcs.append(weakref.ref(other))
+            ref = weakref.ref(other)
+        if ref not in self._funcs:
+            self._funcs.append(ref)
         return self
 
     def __isub__(self, other):

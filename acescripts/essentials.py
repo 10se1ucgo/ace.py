@@ -41,17 +41,7 @@ class EssentialsScript(Script):
 
     @commands.command()
     async def goto(self, connection: ServerConnection, grid_pos: str):
-        letter = grid_pos[0].lower()
-        number = int(grid_pos[1])
-
-        if not ord('a') <= ord(letter) <= ord('h'):
-            return
-        if not 1 <= number <= 8:
-            return
-
-        x = 32 + (64 * (ord(letter) - ord('a')))
-        y = 32 + (64 * (number - 1))
-        print(x, y)
+        x, y = self.protocol.map.from_grid(grid_pos)
         await connection.set_position(x, y)
 
     @commands.command()

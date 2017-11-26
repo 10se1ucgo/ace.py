@@ -7,11 +7,14 @@ import enet
 from acelib.constants import *
 from acelib.math3d import Vector3
 from acemodes import GameMode
-from aceserver import protocol, connection, types
+from aceserver import protocol, connection, types, util
 from aceserver.loaders import progress_bar
 
 
 class Territory(types.CommandPost):
+    on_start_capture = util.AsyncEvent()
+    on_captured = util.AsyncEvent()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._progress = float(self.team.id) if self.team is not None else 0.5
@@ -42,10 +45,11 @@ class Territory(types.CommandPost):
             progress_bar.stopped = True
             self.protocol._broadcast_loader(progress_bar.generate(), connections=left)
 
-        if not old and self.players:
-            capturing = self.protocol.team1 if self.rate < 0 else self.protocol.team2
-            msg = f"{capturing.name} team is capturing {self.get_grid()}"
-            self.protocol.loop.create_task(self.protocol.broadcast_hud_message(msg))
+            if not old and self.players:
+                # there werent any players on it last update but there are now
+                # TODO this isnt the best way
+                capturing = self.protocol.team1 if self.rate < 0 else self.protocol.team2
+                self.protocol.loop.create_task(self.on_start_capture(self, capturing))
 
     @property
     def progress(self):
@@ -56,37 +60,34 @@ class Territory(types.CommandPost):
         value = max(0.0, min(1.0, value))
         if value == self._progress:
             return
+
+        team = False
+        if value == 0.0:
+            team = self.protocol.team1
+        elif value == 1.0:
+            team = self.protocol.team2
+        elif self._progress <= 0.5 <= value:
+            team = None
+
         self._progress = value
 
-        team = None
-        if self._progress == 0.0:
-            team = self.protocol.team1
-        elif self._progress == 1.0:
-            team = self.protocol.team2
-        if team == self.team:
-            return
-        self.protocol.loop.create_task(self.set_team(team))
+        if team is not False and team != self.team:
+            self.protocol.loop.create_task(self.set_team(team))
 
     async def set_team(self, team: types.Team=None):
-        if team is not None:
-            await self.protocol.broadcast_hud_message(f"{team.name} team captured {self.get_grid()}")
         await super().set_team(team)
+        await self.on_captured(self, team)
 
     @property
     def rate(self):
         rate = sum(-1 if ply.team is self.protocol.team1 else 1 for ply in self.players) * TC_CAPTURE_RATE
-        self.rate = rate
+        if rate != self._rate:
+            self.send_progress_bar(rate)
+        self._rate = rate
         return rate
 
-    @rate.setter
-    def rate(self, value):
-        if value == self._rate:
-            return
-        self._rate = value
-        self.send_progress_bar()
-
-    def send_progress_bar(self):
-        progress_bar.set(self.progress, self.rate)
+    def send_progress_bar(self, rate):
+        progress_bar.set(self._progress, rate)
         progress_bar.color1.rgb = self.protocol.team1.color
         progress_bar.color2.rgb = self.protocol.team2.color
         self.protocol._broadcast_loader(progress_bar.generate(), connections=self.players)
@@ -100,12 +101,16 @@ class Territory(types.CommandPost):
 
 class TC(GameMode):
     name = "TC"
-    score_limit = 0
+    score_limit = MAX_TERRITORY_COUNT
 
     async def init(self):
         await super().init()
-        self.territories: Dict[int, Territory] = {}
+        Territory.on_captured = self.on_territory_captured
+        Territory.on_start_capture = self.on_territory_start_capture
+
+        self.territories: List[Territory] = []
         await self.spawn_ents()
+        self.update_scores()
 
     async def spawn_ents(self):
         # Limit to middleish area of the map.
@@ -125,8 +130,29 @@ class TC(GameMode):
                 team = self.protocol.team2
 
             cp = await self.protocol.create_entity(Territory, position, team)
-            self.territories[cp.id] = cp
+            self.territories.append(cp)
 
     async def deinit(self):
-        for ent in self.territories.values(): ent.destroy()
+        for ent in self.territories: ent.destroy()
         self.territories.clear()
+
+    async def reset(self, winner: types.Team=None):
+        if winner is not None:
+            await self.protocol.broadcast_hud_message(f"{winner.name} team wins!")
+        await self.deinit()
+        await self.init()
+
+    def update_scores(self):
+        self.protocol.team1.score = len([t for t in self.territories if t.team is self.protocol.team1])
+        self.protocol.team2.score = len([t for t in self.territories if t.team is self.protocol.team2])
+        self.check_win()
+
+    async def on_territory_captured(self, territory: Territory, capturing: types.Team):
+        grid = self.protocol.map.to_grid(territory.position.x, territory.position.y)
+        msg = f"{capturing.name} team captured {grid}" if capturing is not None else f"{grid} has been neutralized"
+        await self.protocol.broadcast_hud_message(msg)
+        self.update_scores()
+
+    async def on_territory_start_capture(self, territory: Territory, capturing: types.Team):
+        grid = self.protocol.map.to_grid(territory.position.x, territory.position.y)
+        await self.protocol.broadcast_hud_message(f"{capturing.name} team is capturing {grid}")

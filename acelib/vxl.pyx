@@ -56,10 +56,17 @@ cdef class VXLMap:
     def depth(self):
         return MAP_Z
 
-    def to_grid(self, x, y):
+    def to_grid(self, x: double, y: double):
         letter = chr(ord('A') + int(x / 64))
         number = str(int(y / 64) + 1)
         return letter + number
+
+    def from_grid(self, grid: str):
+        letter = grid[0].lower()
+        number = int(grid[1])
+        x = max(0, min(self.width() - 1, 32 + (64 * (ord(letter) - ord('a')))))
+        y = max(0, min(self.length() - 1, 32 + (64 * (number - 1))))
+        return x, y
 
     def __bytes__(self):
         return self.get_bytes()

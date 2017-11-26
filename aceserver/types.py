@@ -185,6 +185,11 @@ class Flag(Entity):
     on_collide = util.AsyncEvent()
 
 
+class CommandPost(Entity):
+    type = ENTITY.COMMAND_POST
+    on_collide = util.AsyncEvent()
+
+
 class Helicopter(Entity):
     type = ENTITY.HELICOPTER
     on_collide = util.AsyncEvent()
@@ -197,11 +202,6 @@ class AmmoCrate(Entity):
 
 class HealthCrate(Entity):
     type = ENTITY.HEALTH_CRATE
-    on_collide = util.AsyncEvent()
-
-
-class CommandPost(Entity):
-    type = ENTITY.COMMAND_POST
     on_collide = util.AsyncEvent()
 
 

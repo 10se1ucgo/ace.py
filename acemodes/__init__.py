@@ -20,8 +20,15 @@ class GameMode:
     async def deinit(self):
         pass
 
-    async def reset(self):
+    async def reset(self, winner: types.Team=None):
         pass
+
+    def check_win(self):
+        team1 = self.protocol.team1
+        team2 = self.protocol.team2
+        if team1.score == self.score_limit or team2.score == self.score_limit:
+            winner = team1 if team1.score > team2.score else team2
+            self.protocol.loop.create_task(self.reset(winner))
 
     def update(self, dt: float):
         pass

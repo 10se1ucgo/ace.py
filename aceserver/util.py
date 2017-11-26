@@ -22,7 +22,6 @@ class IDPool:
         if id in self.ids:
             raise ValueError(f"id {id} has been freed already!")
         self.ids.add(id)
-        print(self.ids)
 
 
 class Event:

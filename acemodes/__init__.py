@@ -43,11 +43,11 @@ class GameMode:
             killer.score += 1
 
     def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[int, int, int]:
-        x, y ,z = self.get_random_pos(player.team)
-        return x, y, z - 2
+        x, y, z = self.get_random_pos(player.team)
+        return x + 0.5, y + 0.5, z - 2
 
     def get_random_pos(self, team):
-        offset = team.id * 384
-        x, y, z = self.protocol.map.get_random_pos(0 + offset, 0, 128 + offset, 512)
-        print(x, y, z)
+        sections = self.protocol.map.width() / 8
+        offset = team.id * (self.protocol.map.width() - (sections * 2))
+        x, y, z = self.protocol.map.get_random_pos(0 + offset, 0, (sections * 2) + offset, self.protocol.map.width())
         return x, y, z

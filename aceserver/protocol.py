@@ -10,7 +10,7 @@ import acescripts
 from acelib import packets, vxl, world
 from acelib.bytes import ByteWriter
 from acelib.constants import *
-from acemodes import GameMode, ctf, de
+from acemodes import GameMode, ctf, de, tc
 from aceserver import base, util, connection, types
 from aceserver.loaders import *
 
@@ -23,7 +23,7 @@ class ServerProtocol(base.BaseProtocol):
             self.map: vxl.VXLMap = vxl.VXLMap(f.read())
 
         self.packs: List[Tuple[bytes, int, int]] = []
-        for pname in ["packs/pack1.zip", "packs/pack2.zip"]:
+        for pname in []:
             with open(pname, "rb") as f:
                 data = f.read()
                 self.packs.append((data, len(data), zlib.crc32(data)))
@@ -49,7 +49,7 @@ class ServerProtocol(base.BaseProtocol):
         self.objects: List[Any] = []
 
         # TODO: configs
-        self.mode: GameMode = ctf.CTF(self)
+        self.mode: GameMode = tc.TC(self)
         self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor", "greeting"]})
         self.max_respawn_time = 5
 
@@ -83,8 +83,13 @@ class ServerProtocol(base.BaseProtocol):
             world_update[conn.id] = (conn.position.xyz, conn.orientation)
         self._broadcast_loader(world_update.generate(), flags=enet.PACKET_FLAG_UNSEQUENCED)
 
-    def _broadcast_loader(self, writer: ByteWriter, flags=enet.PACKET_FLAG_RELIABLE, predicate=None):
+    def _broadcast_loader(self, writer: ByteWriter, flags=enet.PACKET_FLAG_RELIABLE, predicate=None, connections=None):
         packet: enet.Packet = enet.Packet(bytes(writer), flags)
+
+        if connections is not None:
+            for conn in connections:
+                conn.peer.send(0, packet)
+            return
 
         if not callable(predicate):
             return self.host.broadcast(0, packet)
@@ -93,8 +98,8 @@ class ServerProtocol(base.BaseProtocol):
             if predicate(conn):
                 conn.peer.send(0, packet)
 
-    def broadcast_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE, *, predicate=None):
-        return self.loop.run_in_executor(None, self._broadcast_loader, loader.generate(), flags, predicate)
+    def broadcast_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE, *, predicate=None, connections=None):
+        return self.loop.run_in_executor(None, self._broadcast_loader, loader.generate(), flags, predicate, connections)
 
     TObj = TypeVar('TObj')
     def create_object(self, obj_type: Type[TObj], *args, **kwargs) -> TObj:

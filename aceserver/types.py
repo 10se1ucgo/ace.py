@@ -92,13 +92,13 @@ class Entity:
     mountable = False
     on_collide = util.AsyncEvent()
 
-    def __init__(self, entity_id: int, protocol: 'protocol.ServerProtocol', **kwargs):
+    def __init__(self, entity_id: int, protocol: 'protocol.ServerProtocol', position=(0, 0, 0), team=None, carrier=None):
         self.id = entity_id
         self.protocol = protocol
 
-        self.position = math3d.Vector3(*kwargs.get("position", (0, 0, 0)))
-        self.team: Team = kwargs.get("team")
-        self.carrier: connection.ServerConnection = kwargs.get("carrier")
+        self.position = math3d.Vector3(*position)
+        self.team: Team = team
+        self.carrier: connection.ServerConnection = carrier
 
         self.destroyed = False
 
@@ -123,8 +123,10 @@ class Entity:
                 if dist <= 3 ** 2:
                     self.protocol.loop.create_task(self.on_collide(self, conn))
 
-    async def set_team(self, team: Team):
+    async def set_team(self, team: Team=None):
         if self.destroyed:
+            return
+        if team is self.team:
             return
         self.team = team
         state = self.team.id if self.team else TEAM.NEUTRAL
@@ -136,7 +138,7 @@ class Entity:
     async def set_position(self, x: float, y: float, z: float):
         if self.destroyed:
             return
-        self.position.xyz = x, y, z
+        self.position.set(x, y, z)
         change_entity.entity_id = self.id
         change_entity.type = SET.POSITION
         change_entity.position.xyz = self.position.xyz
@@ -144,6 +146,8 @@ class Entity:
 
     async def set_carrier(self, carrier: 'connection.ServerConnection'=None):
         if self.destroyed:
+            return
+        if carrier is self.carrier:
             return
         self.carrier = carrier
         player = self.carrier.id if self.carrier else -1

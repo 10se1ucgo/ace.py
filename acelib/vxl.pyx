@@ -31,7 +31,7 @@ cdef class VXLMap:
         cdef vector[Pos3] neighbors = self.map_data.get_neighbors(x, y, z)
         cdef Pos3 node
         for node in neighbors:
-            if node.z < 62:
+            if self.can_build(node.x, node.y, node.z):
                 self.map_data.check_node(node.x, node.y, node.z, True)
         return ok
 
@@ -46,6 +46,20 @@ cdef class VXLMap:
     cpdef bytes get_bytes(self):
         cdef vector[uint8_t] x = self.map_data.write()
         return x.data()[:x.size()]
+
+    def width(self):
+        return MAP_X
+
+    def length(self):
+        return MAP_Y
+
+    def depth(self):
+        return MAP_Z
+
+    def to_grid(self, x, y):
+        letter = chr(ord('A') + int(x / 64))
+        number = str(int(y / 64) + 1)
+        return letter + number
 
     def __bytes__(self):
         return self.get_bytes()

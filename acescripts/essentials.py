@@ -76,21 +76,16 @@ class EssentialsScript(Script):
     async def fog(self, connection: ServerConnection, r: int, g: int, b: int):
         await self.protocol.set_fog_color(r, g, b)
 
-    @commands.command()
-    async def c(self, connection: ServerConnection):
-        await self.protocol.mode.spawn_ents()
-
-
-    @commands.command()
-    async def a(self, connection: ServerConnection, source: str):
-        ret = eval(source)
-        if inspect.isawaitable(ret):
-            ret = await ret
-        print(ret)
-
-    @commands.command()
-    async def b(self, connection: ServerConnection, source: str):
-        exec(source)
+    # @commands.command()
+    # async def a(self, connection: ServerConnection, source: str):
+    #     ret = eval(source)
+    #     if inspect.isawaitable(ret):
+    #         ret = await ret
+    #     print(ret)
+    #
+    # @commands.command()
+    # async def b(self, connection: ServerConnection, source: str):
+    #     exec(source)
 
 
 def init(protocol: ServerProtocol, cfg: dict):

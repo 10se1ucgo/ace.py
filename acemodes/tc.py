@@ -60,18 +60,19 @@ class Territory(types.CommandPost):
         value = max(0.0, min(1.0, value))
         if value == self._progress:
             return
-
-        team = False
-        if value == 0.0:
-            team = self.protocol.team1
-        elif value == 1.0:
-            team = self.protocol.team2
-        elif self._progress <= 0.5 <= value:
-            team = None
-
+        old = self._progress
         self._progress = value
 
-        if team is not False and team != self.team:
+        if self._progress == 0.0:
+            team = self.protocol.team1
+        elif self._progress == 1.0:
+            team = self.protocol.team2
+        elif min(old, self._progress) <= 0.5 <= max(old, self._progress):
+            team = None
+        else:
+            return
+
+        if team != self.team:
             self.protocol.loop.create_task(self.set_team(team))
 
     async def set_team(self, team: types.Team=None):
@@ -92,11 +93,12 @@ class Territory(types.CommandPost):
         progress_bar.color2.rgb = self.protocol.team2.color
         self.protocol._broadcast_loader(progress_bar.generate(), connections=self.players)
 
-    def get_grid(self):
-        x, y, z = self.position.xyz
-        letter = chr(ord('A') + int(x / 64))
-        number = int(y / 64) + 1
-        return f"{letter}{number}"
+    def get_spawn_location(self):
+        x1 = max(0, self.position.x - SPAWN_RADIUS)
+        y1 = max(0, self.position.y - SPAWN_RADIUS)
+        x2 = min(512, self.position.x + SPAWN_RADIUS)
+        y2 = min(512, self.position.y + SPAWN_RADIUS)
+        return self.protocol.map.get_random_pos(x1, y1, x2, y2)
 
 
 class TC(GameMode):
@@ -105,8 +107,9 @@ class TC(GameMode):
 
     async def init(self):
         await super().init()
-        Territory.on_captured = self.on_territory_captured
-        Territory.on_start_capture = self.on_territory_start_capture
+
+        Territory.on_captured += self.on_territory_captured
+        Territory.on_start_capture += self.on_territory_start_capture
 
         self.territories: List[Territory] = []
         await self.spawn_ents()
@@ -136,12 +139,6 @@ class TC(GameMode):
         for ent in self.territories: ent.destroy()
         self.territories.clear()
 
-    async def reset(self, winner: types.Team=None):
-        if winner is not None:
-            await self.protocol.broadcast_hud_message(f"{winner.name} team wins!")
-        await self.deinit()
-        await self.init()
-
     def update_scores(self):
         self.protocol.team1.score = len([t for t in self.territories if t.team is self.protocol.team1])
         self.protocol.team2.score = len([t for t in self.territories if t.team is self.protocol.team2])
@@ -154,5 +151,13 @@ class TC(GameMode):
         self.update_scores()
 
     async def on_territory_start_capture(self, territory: Territory, capturing: types.Team):
+        if capturing is territory.team:
+            return
         grid = self.protocol.map.to_grid(territory.position.x, territory.position.y)
         await self.protocol.broadcast_hud_message(f"{capturing.name} team is capturing {grid}")
+
+    def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[int, int, int]:
+        # TODO: maybe choose the controlled Territory closest to the enemy side?
+        t: Territory = random.choice([t for t in self.territories if t.team is player.team])
+        x, y, z = t.get_spawn_location()
+        return x + 0.5, y + 0.5, z - 2

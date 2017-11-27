@@ -459,7 +459,7 @@ class ServerConnection(base.BaseConnection):
     async def recv_set_color(self, loader: packets.SetColor):
         if self.dead or self.tool_type != TOOL.BLOCK: return
 
-        self.color = loader.color.rgb
+        self.block.color.rgb = loader.color.rgb
         loader.player_id = self.id
         await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 

@@ -11,7 +11,7 @@ you probably need a C++11 compiler for this
 I hope I did this right.
 ```
 Copyright (C) 10se1ucgo 2017
-based on pyspades (C) Mathias Kaerlev 2011-2012.
+based on pyspades <https://github.com/infogulch/pyspades> (C) Mathias Kaerlev 2011-2012.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

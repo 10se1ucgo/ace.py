@@ -1,7 +1,16 @@
+import asyncio
 from typing import Tuple
 
 from acelib import constants
 from aceserver import protocol, connection, types
+
+
+FOG_COLORS = ((251,  76,   0),
+              (119, 215, 118),
+              ( 37,  78, 235),
+              (222, 209,   2),
+              (224, 113, 234),
+              (255, 255, 255))
 
 
 class GameMode:
@@ -17,18 +26,27 @@ class GameMode:
         types.AmmoCrate.on_collide += self.on_ammo_crate
         connection.ServerConnection.on_player_kill += self.on_player_kill
 
+        self.win_sound = self.protocol.create_sound("horn")
+
     async def deinit(self):
         pass
 
     async def reset(self, winner: types.Team=None):
-        pass
+        if winner is not None:
+            self.protocol.loop.create_task(self.celebrate())
+            await self.protocol.broadcast_hud_message(f"{winner.name} team wins!")
+        await self.deinit()
+        await self.init()
+        for player in self.protocol.players.values():
+            await player.spawn()
+        for team in self.protocol.teams.values():
+            team.reset()
 
     def check_win(self):
-        team1 = self.protocol.team1
-        team2 = self.protocol.team2
-        if team1.score == self.score_limit or team2.score == self.score_limit:
-            winner = team1 if team1.score > team2.score else team2
+        if any(team.score == self.score_limit for team in self.protocol.teams.values()):
+            winner = max(self.protocol.teams.values(), key=lambda team: team.score)
             self.protocol.loop.create_task(self.reset(winner))
+
 
     def update(self, dt: float):
         pass
@@ -58,3 +76,12 @@ class GameMode:
         offset = team.id * (self.protocol.map.width() - (sections * 2))
         x, y, z = self.protocol.map.get_random_pos(0 + offset, 0, (sections * 2) + offset, self.protocol.map.width())
         return x, y, z
+
+    async def celebrate(self):
+        await self.win_sound.play()
+        original = self.protocol.fog_color
+        for x in range(3):
+            for color in FOG_COLORS:
+                await self.protocol.set_fog_color(*color, save=False)
+                await asyncio.sleep(1/3)
+        await self.protocol.set_fog_color(*original)

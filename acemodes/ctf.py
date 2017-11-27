@@ -33,7 +33,6 @@ class CTF(GameMode):
         types.CommandPost.on_collide += self.on_cp_collide
 
         self.pickup_sound = self.protocol.create_sound("pickup")
-        self.capture_sound = self.protocol.create_sound("horn")
 
         # self.crate_sound = self.protocol.create_sound("chopper")
         # self.crate_spawner_task = self.protocol.loop.create_task(self.spawn_crates())
@@ -75,8 +74,9 @@ class CTF(GameMode):
     async def capture_intel(self, player: 'connection.ServerConnection', intel: types.Flag):
         await self.reset_intel(intel)
         player.team.score += 1
+        player.score += 10
         await self.protocol.broadcast_hud_message(f"{player} captured the {intel.team} Intel")
-        await self.capture_sound.play()
+        self.check_win()
 
     async def drop_intel(self, player: 'connection.ServerConnection', intel: types.Flag):
         await intel.set_carrier(None)

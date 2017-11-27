@@ -164,11 +164,12 @@ class ServerProtocol(base.BaseProtocol):
         predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=CHAT.BIG, predicate=predicate)
 
-    def set_fog_color(self, r, g, b):
+    def set_fog_color(self, r, g, b, save=True):
         r &= 255
         g &= 255
         b &= 255
-        self.fog_color = (r, g, b)
+        if save:
+            self.fog_color = (r, g, b)
         fog_color.color.rgb = r, g, b
         return self.broadcast_loader(fog_color)
 

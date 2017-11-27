@@ -59,6 +59,9 @@ class Team:
             if ent.team == self:
                 yield ent
 
+    def reset(self):
+        self.score = 0
+
     def broadcast_chat_message(self, message: str, sender: 'connection.ServerConnection'):
         return self.protocol.broadcast_chat_message(message, sender, team=self)
 

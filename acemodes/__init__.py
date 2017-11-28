@@ -2,7 +2,7 @@ import asyncio
 from typing import Tuple
 
 from acelib import constants
-from aceserver import protocol, connection, types
+from aceserver import protocol, connection, types, util
 
 
 FOG_COLORS = ((251,  76,   0),
@@ -16,6 +16,8 @@ FOG_COLORS = ((251,  76,   0),
 class GameMode:
     name = "Default"
     score_limit = 0
+
+    on_game_end = util.AsyncEvent()
 
     def __init__(self, protocol: 'protocol.ServerProtocol'):
         self.protocol = protocol
@@ -32,8 +34,9 @@ class GameMode:
         pass
 
     async def reset(self, winner: types.Team=None):
+        self.protocol.loop.create_task(self.on_game_end(winner))
         if winner is not None:
-            self.protocol.loop.create_task(self.celebrate())
+            await self.win_sound.play()
             await self.protocol.broadcast_hud_message(f"{winner.name} team wins!")
         await self.deinit()
         await self.init()
@@ -46,7 +49,6 @@ class GameMode:
         if any(team.score == self.score_limit for team in self.protocol.teams.values()):
             winner = max(self.protocol.teams.values(), key=lambda team: team.score)
             self.protocol.loop.create_task(self.reset(winner))
-
 
     def update(self, dt: float):
         pass
@@ -61,9 +63,9 @@ class GameMode:
         crate.destroy()
 
     async def on_player_kill(self, player: 'connection.ServerConnection', kill_type: constants.KILL, killer: 'connection.ServerConnection'):
-        if killer is player:
+        if not killer or killer is player:
             # suicide
-            killer.score -= 1
+            player.score -= 1
         else:
             killer.score += 1
 
@@ -76,12 +78,3 @@ class GameMode:
         offset = team.id * (self.protocol.map.width() - (sections * 2))
         x, y, z = self.protocol.map.get_random_pos(0 + offset, 0, (sections * 2) + offset, self.protocol.map.width())
         return x, y, z
-
-    async def celebrate(self):
-        await self.win_sound.play()
-        original = self.protocol.fog_color
-        for x in range(3):
-            for color in FOG_COLORS:
-                await self.protocol.set_fog_color(*color, save=False)
-                await asyncio.sleep(1/3)
-        await self.protocol.set_fog_color(*original)

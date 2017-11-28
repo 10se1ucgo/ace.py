@@ -144,7 +144,7 @@ def to_entity(conn: ServerConnection, parameter: str) -> ServerConnection:
         return names.get(parameter.lower())
 
 
-# TODO permissions
+# TODO permissions, aliases
 def command(name=None):
     def decorator(func):
         return Command(name or func.__name__, func)

@@ -50,7 +50,7 @@ class ServerProtocol(base.BaseProtocol):
 
         # TODO: configs
         self.mode: GameMode = tc.TC(self)
-        self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor", "greeting"]})
+        self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor", "greeting", "disco"]})
         self.max_respawn_time = 5
 
     async def run(self):
@@ -158,7 +158,7 @@ class ServerProtocol(base.BaseProtocol):
 
     def broadcast_server_message(self, message: str, team: types.Team=None):
         predicate = (lambda conn: conn.team == team) if team else None
-        return self.broadcast_message(message, chat_type=CHAT.BIG, predicate=predicate)
+        return self.broadcast_message(message, chat_type=CHAT.SYSTEM, predicate=predicate)
 
     def broadcast_hud_message(self, message: str, team: types.Team =None):
         predicate = (lambda conn: conn.team == team) if team else None

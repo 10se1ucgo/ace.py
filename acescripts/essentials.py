@@ -14,8 +14,8 @@ from acescripts import Script, commands
 
 
 class EssentialsScript(Script):
-    def __init__(self, protocol: ServerProtocol, cfg: dict):
-        super().__init__(protocol, cfg)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # TODO is this the best way to add commands?
         # Perhaps the commands script should check each script for commands by itself.
         self.protocol.scripts.get("commands").add_commands(self)
@@ -88,5 +88,5 @@ class EssentialsScript(Script):
     #     exec(source)
 
 
-def init(protocol: ServerProtocol, cfg: dict):
-    return EssentialsScript(protocol, cfg)
+def init(protocol: ServerProtocol):
+    return EssentialsScript(protocol)

@@ -20,11 +20,12 @@ class BaseConnection:
 
 
 class BaseProtocol:
-    def __init__(self, loop: asyncio.AbstractEventLoop, interface: str=None, port: int=32887, max_connections: int=32,
+    def __init__(self, loop: asyncio.AbstractEventLoop, interface: str="", port: int=32887, max_connections: int=32,
                  connection_factory=BaseConnection):
         self.loop: asyncio.AbstractEventLoop = loop
         self.host: enet.Host = enet.Host(enet.Address(interface, port), max_connections, 1, 0, 0)
         self.host.compress_with_range_coder()
+        self.host.intercept = self.intercept
         self.connection_factory = connection_factory
 
         self.connections: typing.Dict[enet.Peer, connection_factory] = {}
@@ -111,6 +112,8 @@ class BaseProtocol:
 
         await connection.on_receive(packet)
 
+    def intercept(self, address: enet.Address, data: bytes):
+        pass
 
 def net_finish(future):
     e = future.exception()

@@ -24,8 +24,8 @@ COLORS = [
 
 
 class DiscoScript(Script):
-    def __init__(self, protocol: ServerProtocol, cfg: dict):
-        super().__init__(protocol, cfg)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.protocol.scripts.get("commands").add_commands(self)
         self.protocol.mode.on_game_end += self.on_game_end
 
@@ -69,5 +69,5 @@ class DiscoScript(Script):
         await self.disco(3)
 
 
-def init(protocol: ServerProtocol, cfg: dict):
-    return DiscoScript(protocol, cfg)
+def init(protocol: ServerProtocol):
+    return DiscoScript(protocol)

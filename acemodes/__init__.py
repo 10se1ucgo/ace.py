@@ -15,12 +15,16 @@ FOG_COLORS = ((251,  76,   0),
 
 class GameMode:
     name = "Default"
-    score_limit = 0
 
-    on_game_end = util.AsyncEvent()
+    @property
+    def score_limit(self):
+        return self.config.get("score_limit", 10)
+
 
     def __init__(self, protocol: 'protocol.ServerProtocol'):
         self.protocol = protocol
+        self.config = protocol.config.get("acemodes.default")
+        self.config.update(protocol.config.get(str(self.__module__), {}))
 
     async def init(self):
         # TODO should this be in the base GameMode or should this just be default behaviour within these classes?
@@ -78,3 +82,6 @@ class GameMode:
         offset = team.id * (self.protocol.map.width() - (sections * 2))
         x, y, z = self.protocol.map.get_random_pos(0 + offset, 0, (sections * 2) + offset, self.protocol.map.width())
         return x, y, z
+
+    # Hooks
+    on_game_end = util.AsyncEvent()

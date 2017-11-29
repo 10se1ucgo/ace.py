@@ -5,28 +5,27 @@ from collections import OrderedDict
 from aceserver import protocol
 
 class Script:
-    def __init__(self, protocol, cfg):
+    def __init__(self, protocol):
         self.protocol: 'protocol.ServerProtocol' = protocol
-        self.cfg: dict = cfg
+        self.config: dict = self.protocol.config.get(str(self.__module__), {})
 
     def deinit(self):
         pass
 
 
 class ScriptLoader:
-    def __init__(self, protocol, config: dict):
+    def __init__(self, protocol):
         self.protocol = protocol
-        self.config = config
         self.scripts: Dict[str, Script] = OrderedDict()
 
     def load_scripts(self, reload=False):
         self.unload_scripts()
 
-        for script_name in self.config["scripts"]:
+        for script_name in self.protocol.config["scripts"]:
             module = importlib.import_module(f"acescripts.{script_name}")
             if reload:
                 module = importlib.reload(module)
-            script = module.init(self.protocol, self.config)
+            script = module.init(self.protocol)
             if not isinstance(script, Script):
                 raise TypeError(f"Script {script_name} did not return a Script instance!")
             self.scripts[script_name] = script

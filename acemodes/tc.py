@@ -11,15 +11,25 @@ from aceserver import protocol, connection, types, util
 from aceserver.loaders import progress_bar
 
 
+DEFAULT_CAPTURE_DISTANCE = 16
+DEFAULT_CAPTURE_RATE = 0.05
+DEFAULT_TERRITORY_COUNT = 7
+DEFAULT_SPAWN_RADIUS = 32
+
+
+
 class Territory(types.CommandPost):
     on_start_capture = util.AsyncEvent()
     on_captured = util.AsyncEvent()
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, capture_radius=None, capture_rate=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._progress = float(self.team.id) if self.team is not None else 0.5
         self._rate = 0
         self.players = []
+
+        self.capture_radius = capture_radius or DEFAULT_CAPTURE_DISTANCE
+        self.capture_rate = capture_rate or DEFAULT_CAPTURE_RATE
 
     def update(self, dt):
         if self.destroyed:
@@ -36,7 +46,7 @@ class Territory(types.CommandPost):
             if ply.dead: continue
 
             dist = self.position.sq_distance(ply.position)
-            if dist <= TC_CAPTURE_DISTANCE ** 2:
+            if dist <= self.capture_radius ** 2:
                 self.players.append(ply)
 
         if self.players != old:
@@ -81,7 +91,7 @@ class Territory(types.CommandPost):
 
     @property
     def rate(self):
-        rate = sum(-1 if ply.team is self.protocol.team1 else 1 for ply in self.players) * TC_CAPTURE_RATE
+        rate = sum(-1 if ply.team is self.protocol.team1 else 1 for ply in self.players) * self.capture_rate
         if rate != self._rate:
             self.send_progress_bar(rate)
         self._rate = rate
@@ -93,17 +103,20 @@ class Territory(types.CommandPost):
         progress_bar.color2.rgb = self.protocol.team2.color
         self.protocol._broadcast_loader(progress_bar.generate(), connections=self.players)
 
-    def get_spawn_location(self):
-        x1 = max(0, self.position.x - SPAWN_RADIUS)
-        y1 = max(0, self.position.y - SPAWN_RADIUS)
-        x2 = min(512, self.position.x + SPAWN_RADIUS)
-        y2 = min(512, self.position.y + SPAWN_RADIUS)
+    def get_spawn_location(self, radius=DEFAULT_SPAWN_RADIUS):
+        x1 = max(0, self.position.x - radius)
+        y1 = max(0, self.position.y - radius)
+        x2 = min(512, self.position.x + radius)
+        y2 = min(512, self.position.y + radius)
         return self.protocol.map.get_random_pos(x1, y1, x2, y2)
 
 
 class TC(GameMode):
     name = "TC"
-    score_limit = MAX_TERRITORY_COUNT
+
+    @property
+    def score_limit(self):
+        return self.config.get("territory_count", DEFAULT_TERRITORY_COUNT)
 
     async def init(self):
         await super().init()
@@ -122,17 +135,19 @@ class TC(GameMode):
         y2 = l * (5 / 8)
 
         # Max distance between each point
-        interval = self.protocol.map.width() / MAX_TERRITORY_COUNT
-        for x in range(MAX_TERRITORY_COUNT):
+        interval = self.protocol.map.width() / self.score_limit
+        for x in range(self.score_limit):
             position = self.protocol.map.get_random_pos(interval * x, y1, interval * (x + 1), y2)
 
             team = None
-            if x < MAX_TERRITORY_COUNT // 2:
+            if x < self.score_limit // 2:
                 team = self.protocol.team1
-            elif x > (MAX_TERRITORY_COUNT - 1) // 2:
+            elif x > (self.score_limit - 1) // 2:
                 team = self.protocol.team2
 
-            cp = await self.protocol.create_entity(Territory, position, team)
+            cp = await self.protocol.create_entity(Territory, position, team,
+                                                   capture_radius=self.config.get("capture_radius"),
+                                                   capture_rate=self.config.get("capture_rate"))
             self.territories.append(cp)
 
     async def deinit(self):

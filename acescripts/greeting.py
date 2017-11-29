@@ -9,9 +9,9 @@ from acescripts import Script
 
 
 class GreetingScript(Script):
-    def __init__(self, protocol: ServerProtocol, cfg: dict):
-        super().__init__(protocol, cfg)
-        self.intro_sound = protocol.create_sound("intro")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.intro_sound = self.protocol.create_sound("intro")
         # TODO find a cleaner way to have this
         ServerConnection.on_player_connect += self.intro
         ServerConnection.on_player_join += self.greet
@@ -24,5 +24,5 @@ class GreetingScript(Script):
         await self.protocol.broadcast_message(f"{connection.name} has joined the server.")
 
 
-def init(protocol: ServerProtocol, cfg: dict):
-    return GreetingScript(protocol, cfg)
+def init(protocol: ServerProtocol):
+    return GreetingScript(protocol)

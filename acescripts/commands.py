@@ -76,10 +76,10 @@ class Command:
 class CommandsScript(Script):
     COMMAND_PREFIX = "/"
 
-    def __init__(self, protocol: ServerProtocol, cfg: dict):
-        super().__init__(protocol, cfg)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.commands: Dict[str, Command] = {}
-        self.command_prefix = cfg.get("command_prefix", self.COMMAND_PREFIX)
+        self.command_prefix = self.config.get("command_prefix", self.COMMAND_PREFIX)
 
         ServerConnection.try_chat_message += self.try_chat_message
 
@@ -151,5 +151,5 @@ def command(name=None):
     return decorator
 
 
-def init(protocol: ServerProtocol, cfg: dict):
-    return CommandsScript(protocol, cfg)
+def init(protocol: ServerProtocol):
+    return CommandsScript(protocol)

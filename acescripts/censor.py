@@ -9,10 +9,10 @@ from acescripts import Script
 
 
 class CensorScript(Script):
-    def __init__(self, protocol: ServerProtocol, cfg: dict):
-        super().__init__(protocol, cfg)
-        self.bad_words = ["fuck", "piss", "shit", "cunt"] + cfg.get("bad_words", [])
-        self.really_bad_words = ["faggot"] + cfg.get("really_bad_words", [])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bad_words = ["fuck", "piss", "shit", "cunt"] + self.config.get("bad_words", [])
+        self.really_bad_words = ["faggot"] + self.config.get("really_bad_words", [])
         # TODO find a cleaner way to have this
         ServerConnection.try_chat_message += self.censor
 
@@ -28,5 +28,5 @@ class CensorScript(Script):
         return message
 
 
-def init(protocol: ServerProtocol, cfg: dict):
-    return CensorScript(protocol, cfg)
+def init(protocol: ServerProtocol):
+    return CensorScript(protocol)

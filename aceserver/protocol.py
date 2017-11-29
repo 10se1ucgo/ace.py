@@ -1,4 +1,5 @@
 import asyncio
+import json
 import textwrap
 import zlib
 from contextlib import contextmanager
@@ -16,14 +17,21 @@ from aceserver.loaders import *
 
 
 class ServerProtocol(base.BaseProtocol):
-    def __init__(self, *args, **kwargs):
-        super(ServerProtocol, self).__init__(*args, **kwargs, connection_factory=connection.ServerConnection)
+    def __init__(self, config, *, loop):
+        super().__init__(loop=loop, interface=config["server"]["interface"], port=config["server"]["port"],
+                         connection_factory=connection.ServerConnection)
 
-        with open("normandie.vxl", "rb") as f:
+        self.config = config
+        self.name = self.config["server"]["name"]
+        # TODO use this
+        self.max_players = self.config["server"]["max_players"]
+
+        with open(self.config["server"]["map"], "rb") as f:
             self.map: vxl.VXLMap = vxl.VXLMap(f.read())
+            self.map_name =  f.name
 
         self.packs: List[Tuple[bytes, int, int]] = []
-        for pname in []:
+        for pname in self.config["server"].get("packs", ()):
             with open(pname, "rb") as f:
                 data = f.read()
                 self.packs.append((data, len(data), zlib.crc32(data)))
@@ -50,7 +58,7 @@ class ServerProtocol(base.BaseProtocol):
 
         # TODO: configs
         self.mode: GameMode = tc.TC(self)
-        self.scripts = acescripts.ScriptLoader(self, {"scripts": ["commands", "essentials", "censor", "greeting", "disco"]})
+        self.scripts = acescripts.ScriptLoader(self)
         self.max_respawn_time = 5
 
     async def run(self):
@@ -214,3 +222,15 @@ class ServerProtocol(base.BaseProtocol):
     def init_hooks(self):
         connection.ServerConnection.on_player_join += self.player_joined
         connection.ServerConnection.on_player_leave += self.player_left
+
+    def intercept(self, address: enet.Address, data: bytes):
+        # Respond to server list query from client
+        if data == b'HELLO':
+            return self.host.socket.send(address, b'HI')
+        elif data == b'HELLOLAN':
+            entry = {
+                "name": self.name, "players_current": len(self.players), "players_max": self.max_players,
+                "map": self.map_name, "game_mode": self.mode.name, "game_version": "1.0a1"
+            }
+            payload = json.dumps(entry).encode()
+            self.host.socket.send(address, payload)

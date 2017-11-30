@@ -5,14 +5,6 @@ from acelib import constants
 from aceserver import protocol, connection, types, util
 
 
-FOG_COLORS = ((251,  76,   0),
-              (119, 215, 118),
-              ( 37,  78, 235),
-              (222, 209,   2),
-              (224, 113, 234),
-              (255, 255, 255))
-
-
 class GameMode:
     name = "Default"
 
@@ -23,8 +15,9 @@ class GameMode:
 
     def __init__(self, protocol: 'protocol.ServerProtocol'):
         self.protocol = protocol
-        self.config = protocol.config.get("acemodes.default")
-        self.config.update(protocol.config.get(str(self.__module__), {}))
+        self.config = protocol.config.get("modes.default")
+        module_name = ''.join(str(self.__module__).split(".")[1:])  # strip package name
+        self.config.update(protocol.config.get("modes." + module_name, {}))
 
     async def init(self):
         # TODO should this be in the base GameMode or should this just be default behaviour within these classes?

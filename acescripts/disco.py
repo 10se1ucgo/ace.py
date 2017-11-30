@@ -43,11 +43,11 @@ class DiscoScript(Script):
 
     async def toggle_disco(self):
         if not self.disco_task or self.disco_task.cancelled():
-            await self.protocol.broadcast_server_message("[*] DISCO PARTY MODE ENABLED!")
+            await self.protocol.broadcast_server_message("DISCO PARTY MODE ENABLED!")
             self.disco_task = self.protocol.loop.create_task(self.disco())
             await self.disco_sound.play()
         else:
-            await self.protocol.broadcast_server_message("[*] The party has been stopped.")
+            await self.protocol.broadcast_server_message("The party has been stopped.")
             self.disco_task.cancel()
             self.disco_task = None
             await self.disco_sound.stop()

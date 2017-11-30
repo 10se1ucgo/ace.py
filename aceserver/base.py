@@ -98,7 +98,6 @@ class BaseProtocol:
         await connection.on_connect(data)
 
     async def on_disconnect(self, peer: enet.Peer):
-        print("disconnect BOY")
         connection: typing.Optional[BaseConnection] = self.connections.pop(peer, None)
         if not connection:
             return
@@ -114,6 +113,7 @@ class BaseProtocol:
 
     def intercept(self, address: enet.Address, data: bytes):
         pass
+
 
 def net_finish(future):
     e = future.exception()

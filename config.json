@@ -1,25 +1,39 @@
 {
-  "server": {
-    "name": "ace.py server",
-    "map": "normandie.vxl",
-    "packs": [],
+  "name": "ace.py server",
+  "map": "normandie.vxl",
+  "packs": [],
 
-    "max_players": 32,
+  "max_players": 32,
 
-    "interface": "",
-    "port": 32887
+  "interface": "",
+  "port": 32887,
+
+  "team1": {
+    "name": "Blue",
+    "color": [44, 117, 179]
   },
+  "team2":  {
+    "name": "Green",
+    "color": [137, 179, 44]
+  },
+  "fog_color": [128, 232, 255],
 
   "mode": "tc",
-  "acemodes.default": {
+  "modes.default": {
     "respawn_time": 10,
     "score_limit": 10
   },
-
-  "acemodes.{game_mode_name_here}": {
+  "modes.{game_mode_name_here}": {
   },
 
   "scripts": ["commands", "essentials", "censor", "greeting", "disco"],
-  "acescripts.{script_module_name_here}": {
+  "scripts.commands": {
+    "admin_passwords": ["123", "456"],
+    "roles": {
+      "moderator": {
+        "passwords": ["789"],
+        "permissions": ["fog", "hurt", "setpos"]
+      }
+    }
   }
 }

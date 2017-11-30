@@ -50,6 +50,9 @@ class ServerConnection(base.BaseConnection):
         if data != PROTOCOL_VERSION:
             return await self.disconnect(DISCONNECT.WRONG_VERSION)
 
+        if len(self.protocol.connections) - 1 >= self.protocol.max_players:
+            return await self.disconnect(DISCONNECT.FULL)
+
         self.protocol.loop.create_task(self.connection_ack())
 
     async def on_disconnect(self):
@@ -72,7 +75,6 @@ class ServerConnection(base.BaseConnection):
         self.peer.send(0, packet)
 
     def send_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE):
-
         # does this even DO anything?? enet just queues the packet for the next host_service call...
         # perhaps sending doesnt need to be coros, but receiving should.
         # please send help i have no clue what im doing

@@ -1,5 +1,5 @@
 """
-Base script that implements command handling. Doesn't do anything on its own.
+Base script that implements command handling.
 
 Creator: 10se1ucgo
 """
@@ -16,6 +16,12 @@ from aceserver.types import Entity, ENTITIES
 from acescripts import Script
 
 
+def command(name=None, aliases=None, admin=False):
+    def decorator(func):
+        return Command(name or func.__name__, func, aliases, admin)
+    return decorator
+
+
 class NotEnoughArguments(TypeError):
     pass
 
@@ -25,10 +31,12 @@ class IncorrectParameters(TypeError):
 
 
 class Command:
-    def __init__(self, name: str, func: callable):
+    def __init__(self, name: str, func: callable, aliases=None, admin=False):
         self.name = name
         self.func = func
         self.signature = inspect.signature(func)
+        self.aliases = aliases or []
+        self.admin = admin
         self.instance = None
 
     def __call__(self, connection: ServerConnection, msg: list):
@@ -80,18 +88,24 @@ class CommandsScript(Script):
         super().__init__(*args, **kwargs)
         self.commands: Dict[str, Command] = {}
         self.command_prefix = self.config.get("command_prefix", self.COMMAND_PREFIX)
+        self.roles = self.config.get("roles", {})
 
         ServerConnection.try_chat_message += self.try_chat_message
+        self.add_commands(self)  # ha
 
     def add_commands(self, klass):
         for name, command in inspect.getmembers(klass, lambda member: isinstance(member, Command)):
             command.instance = klass
             self.commands[command.name] = command
+            for alias in command.aliases:
+                self.commands[alias] = command
 
     def remove_commands(self, klass):
         for command in self.commands.copy().values():
             if command.instance is klass:
                 command.instance = None
+                for alias in command.aliases:
+                    self.commands.pop(alias)
                 self.commands.pop(command.name)
 
     async def try_chat_message(self, connection: ServerConnection, message: str, type: CHAT):
@@ -105,14 +119,30 @@ class CommandsScript(Script):
         command_name = fragments[0]
         command = self.commands.get(command_name)
         if not command:
+            await connection.send_server_message("That command doesn't exist.")
+            return False
+        if not can_invoke(connection, command):
+            await connection.send_server_message("You do not have permission to use that command.")
             return False
 
         try:
             await command(connection, fragments[1:])
         except Exception:
+            await connection.send_server_message(f"Error executing command {command.name}, not enough or malformed arguments")
             print(f"Ignoring error in command {command.name}", file=sys.stderr)
             traceback.print_exc()
         return False
+
+    @command()
+    async def login(self, connection: ServerConnection, password: str):
+        if password in self.config.get("admin_passwords", ()):
+            connection.store["commands_admin"] = True
+            await connection.send_server_message("You logged in as an admin -- all rights granted.")
+
+        for name, options in self.config.get("roles", {}).items():
+            if password in options.get("passwords", ()):
+                connection.store.setdefault("commands_permissions", set()).update(options.get("permissions", ()))
+                await connection.send_server_message(f"You logged in as {name}")
 
 
 _converters: Dict[str, Callable] = {}
@@ -144,11 +174,11 @@ def to_entity(conn: ServerConnection, parameter: str) -> ServerConnection:
         return names.get(parameter.lower())
 
 
-# TODO permissions, aliases
-def command(name=None):
-    def decorator(func):
-        return Command(name or func.__name__, func)
-    return decorator
+def can_invoke(connection: ServerConnection, command: Command):
+    if not command.admin or connection.store.get("commands_admin", False):
+        return True
+
+    return command.name in connection.store.get("commands_permissions", ())
 
 
 def init(protocol: ServerProtocol):

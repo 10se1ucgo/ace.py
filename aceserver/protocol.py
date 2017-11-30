@@ -18,20 +18,19 @@ from aceserver.loaders import *
 
 class ServerProtocol(base.BaseProtocol):
     def __init__(self, config, *, loop):
-        super().__init__(loop=loop, interface=config["server"]["interface"], port=config["server"]["port"],
+        super().__init__(loop=loop, interface=config["interface"], port=config["port"],
                          connection_factory=connection.ServerConnection)
 
         self.config = config
-        self.name = self.config["server"]["name"]
-        # TODO use this
-        self.max_players = self.config["server"]["max_players"]
+        self.name = self.config["name"]
+        self.max_players = min(32, self.config.get("max_players", 32))
 
-        with open(self.config["server"]["map"], "rb") as f:
+        with open(self.config["map"], "rb") as f:
             self.map: vxl.VXLMap = vxl.VXLMap(f.read())
             self.map_name =  f.name
 
         self.packs: List[Tuple[bytes, int, int]] = []
-        for pname in self.config["server"].get("packs", ()):
+        for pname in self.config.get("packs", ()):
             with open(pname, "rb") as f:
                 data = f.read()
                 self.packs.append((data, len(data), zlib.crc32(data)))
@@ -43,20 +42,22 @@ class ServerProtocol(base.BaseProtocol):
         self.entity_ids = util.IDPool(stop=255)
         self.sound_ids = util.IDPool(stop=255)
 
-        self.team1 = types.Team(self, TEAM.TEAM1, "Blue", (44, 117, 179))
-        self.team2 = types.Team(self, TEAM.TEAM2, "Green", (137, 179, 44))
+        team1 = self.config.get("team1", {})
+        team2 = self.config.get("team2", {})
+        self.team1 = types.Team(self, TEAM.TEAM1, team1.get("name", "Blue"), team1.get("color", (44, 117, 179)))
+        self.team2 = types.Team(self, TEAM.TEAM2, team2.get("name", "Green"), team2.get("color", (137, 179, 44)))
         self.team1.other = self.team2
         self.team2.other = self.team1
         self.teams = {self.team1.id: self.team1, self.team2.id: self.team2}
 
-        self.fog_color = (128, 232, 255)
+        self.fog_color = self.config.get("fog_color", (128, 232, 255))
 
         self.players: Dict[int, connection.ServerConnection] = {}
         self.entities: Dict[int, types.Entity] = {}
         self.sounds: Dict[int, types.Sound] = {}
         self.objects: List[Any] = []
 
-        # TODO: configs
+        # TODO: load gamemode from config
         self.mode: GameMode = tc.TC(self)
         self.scripts = acescripts.ScriptLoader(self)
         self.max_respawn_time = 5
@@ -166,7 +167,7 @@ class ServerProtocol(base.BaseProtocol):
 
     def broadcast_server_message(self, message: str, team: types.Team=None):
         predicate = (lambda conn: conn.team == team) if team else None
-        return self.broadcast_message(message, chat_type=CHAT.SYSTEM, predicate=predicate)
+        return self.broadcast_message("[*] " + message, chat_type=CHAT.SYSTEM, predicate=predicate)
 
     def broadcast_hud_message(self, message: str, team: types.Team =None):
         predicate = (lambda conn: conn.team == team) if team else None

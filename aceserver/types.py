@@ -51,12 +51,12 @@ class Team:
 
     def players(self) -> Generator['connection.ServerConnection', None, None]:
         for conn in self.protocol.players.values():
-            if conn.player.team == self:
+            if conn.player.team is self:
                 yield conn
 
     def entities(self) -> Generator['Entity', None, None]:
         for ent in self.protocol.entities.values():
-            if ent.team == self:
+            if ent.team is self:
                 yield ent
 
     def reset(self):

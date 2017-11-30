@@ -2,12 +2,14 @@ import importlib
 from typing import Dict
 from collections import OrderedDict
 
-from aceserver import protocol
+from aceserver import protocol as proto
+
 
 class Script:
     def __init__(self, protocol):
-        self.protocol: 'protocol.ServerProtocol' = protocol
-        self.config: dict = self.protocol.config.get(str(self.__module__), {})
+        self.protocol: 'proto.ServerProtocol' = protocol
+        module_name = ''.join(str(self.__module__).split(".")[1:])  # strip package name
+        self.config: dict = self.protocol.config.get(f"scripts.{module_name}", {})
 
     def deinit(self):
         pass

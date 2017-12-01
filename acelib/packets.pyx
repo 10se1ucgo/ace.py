@@ -145,7 +145,7 @@ cdef class WorldUpdate(Loader):
             wud.write(writer)
 
     def clear(self):
-        self.data.clear()
+        self.data = {}
 
     def __setitem__(self, uint8_t key, value):
         self.data[key] = WorldUpdateData(*value[0], *value[1])

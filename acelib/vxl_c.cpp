@@ -73,9 +73,22 @@ void AceMap::read(uint8_t *buf) {
 std::vector<uint8_t> AceMap::write() {
     std::vector<uint8_t> v;
     v.reserve(5 * 1024 * 1024);
+    int x = 0, y = 0;
+    this->write(v, &x, &y);
+    return v;
+}
 
-    for (int y = 0; y < MAP_Y; ++y) {
-        for (int x = 0; x < MAP_X; ++x) {
+size_t AceMap::write(std::vector<uint8_t> &v, int *sx, int *sy, int columns) {
+    size_t initial_size = v.size();
+    int column = 0;
+    const bool all = columns < 0;
+
+    int y, x;
+    for (y = *sy; y < MAP_Y; ++y) {
+        for (x = *sx; x < MAP_X; ++x) {
+            if (!all && column >= columns) {
+                goto done;
+            }
             int z = 0;
             while (z < MAP_Z) {
                 // find the air region
@@ -133,9 +146,14 @@ std::vector<uint8_t> AceMap::write() {
                 for (i = 0; i < bottom_colors_len; ++i)
                     write_bytes(v, this->colors[get_pos(x, y, bottom_colors_start + i)]);
             }
+            column++;
         }
+        *sx = 0;
     }
-    return v;
+done:
+    *sx = x;
+    *sy = y;
+    return v.size() - initial_size;
 }
 
 bool AceMap::is_surface(const int x, const int y, const int z) {

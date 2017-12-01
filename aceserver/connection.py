@@ -139,17 +139,13 @@ class ServerConnection(base.BaseConnection):
                         await self.send_loader(pack_chunk)
 
     async def send_map(self):
-        map: bytes = zlib.compress(self.protocol.map.get_bytes(), 9)
-        map_start.size = len(map)
+        map = self.protocol.map
+        map_start.size = map.estimated_size
         await self.send_loader(map_start)
 
-        with io.BytesIO(map) as f:
-            while True:
-                data = f.read(1024)
-                if not data:
-                    break
-                map_chunk.data = data
-                await self.send_loader(map_chunk)
+        for data in map.iter_compressed():
+            map_chunk.data = data
+            await self.send_loader(map_chunk)
 
     async def send_state(self):
         data = self.protocol.get_state()

@@ -32,6 +32,7 @@ public:
     AceMap(uint8_t *buf = nullptr);
     void read(uint8_t *buf);
     std::vector<uint8_t> write();
+    size_t write(std::vector<uint8_t> &v, int *sx, int *sy, int columns=-1);
 
     bool is_surface(const int x, const int y, const int z);
     bool get_solid(int x, int y, int z, bool wrapped=false);

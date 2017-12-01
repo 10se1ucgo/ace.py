@@ -11,6 +11,7 @@ cdef extern from "vxl_c.h" nogil:
         AceMap(uint8_t *buf) except +
         void read(uint8_t *buf) except +
         vector[uint8_t] write() except +
+        size_t write(vector[uint8_t] &v, int *sx, int *sy, int columns);
 
         bool is_surface(int x, int y, int z) except +
         bool get_solid(int x, int y, int z, bool wrapped=False) except +
@@ -33,8 +34,8 @@ cdef extern from "vxl_c.h" nogil:
     enum: MAP_X, MAP_Y, MAP_Z, DEFAULT_COLOR
 
 cdef class VXLMap:
-    cdef:
-        AceMap *map_data
+    cdef AceMap *map_data
+    cdef public int estimated_size
 
     cpdef bint can_build(self, int x, int y, int z)
 
@@ -46,3 +47,8 @@ cdef class VXLMap:
     # cpdef list get_neighbors(self, int x, int y, int z)
 
     cpdef bytes get_bytes(self)
+
+
+cdef class VXLMapIterator:
+    cdef public:
+        VXLMap map

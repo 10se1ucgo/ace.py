@@ -38,10 +38,9 @@ class BaseProtocol:
         print(f"Running server on {ip}:{port}")
         print(f"Server identifier is {util.get_identifier(ip, port)}")
 
-        # start = self.loop.time()
-        last: float = t.perf_counter()
+        last: float = self.loop.time()
         while self.running:
-            now = t.perf_counter()
+            now = self.loop.time()
             dt = now - last
             self.time += dt
             try:
@@ -50,7 +49,6 @@ class BaseProtocol:
                 print("Ignoring exception in update(): ")
                 traceback.print_exc()
             await asyncio.sleep(1 / 50)
-            # print(self.time, 1 / (dt or 1))
             last = now
 
     def stop(self):

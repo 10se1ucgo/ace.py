@@ -7,14 +7,15 @@ VXL_MAP_Z = MAP_Z
 VXL_DEFAULT_COLOR = DEFAULT_COLOR
 
 cdef class VXLMap:
-    def __cinit__(self, uint8_t *buffer=NULL):
+    def __cinit__(self, uint8_t *buffer=NULL, str name="unknown"):
         self.map_data = new AceMap(buffer)
         self.estimated_size = len(buffer)
+        self.name = name
 
     def __dealloc__(self):
         del self.map_data
 
-    def __init__(self, uint8_t *buffer=NULL):
+    def __init__(self, uint8_t *buffer=NULL, str name="unknown"):
         # just to make my ide happy LUL
         pass
 

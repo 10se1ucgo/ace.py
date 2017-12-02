@@ -21,6 +21,13 @@ loop._clock_resolution = time.get_clock_info('perf_counter').resolution
 loop.set_debug(True)
 
 server = protocol.ServerProtocol(config, loop=loop)
+
+try:
+    # aioconsole debugging stuff :)
+    loop.console.locals['server'] = loop.console.locals['protocol'] = server
+except AttributeError:
+    pass
+
 try:
     loop.add_signal_handler(signal.SIGINT, server.stop)
     loop.add_signal_handler(signal.SIGTERM, server.stop)

@@ -91,6 +91,7 @@ class CommandsScript(Script):
         self.roles = self.config.get("roles", {})
 
         ServerConnection.try_chat_message += self.try_chat_message
+        self.protocol.scripts.on_scripts_loaded += self.on_scripts_loaded
         self.add_commands(self)  # ha
 
     def add_commands(self, klass):
@@ -144,6 +145,13 @@ class CommandsScript(Script):
                 connection.store.setdefault("commands_permissions", set()).update(options.get("permissions", ()))
                 await connection.send_server_message(f"You logged in as {name}")
 
+    def on_scripts_loaded(self, scripts):
+        for script in scripts.values():
+            self.add_commands(script)
+
+    def on_scripts_unloaded(self, scripts):
+        for script in scripts.values():
+            self.remove_commands(script)
 
 _converters: Dict[str, Callable] = {}
 def register_converter(param_type):

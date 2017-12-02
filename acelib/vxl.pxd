@@ -35,7 +35,9 @@ cdef extern from "vxl_c.h" nogil:
 
 cdef class VXLMap:
     cdef AceMap *map_data
-    cdef public int estimated_size
+    cdef public:
+        int estimated_size
+        str name
 
     cpdef bint can_build(self, int x, int y, int z)
 

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import textwrap
+import os
 import zlib
 from contextlib import contextmanager
 from typing import *
@@ -8,10 +9,10 @@ from typing import *
 import enet
 
 import acescripts
+import acemodes
 from acelib import packets, vxl, world
 from acelib.bytes import ByteWriter
 from acelib.constants import *
-from acemodes import GameMode, ctf, de, tc
 from aceserver import base, util, connection, types
 from aceserver.loaders import *
 
@@ -26,8 +27,7 @@ class ServerProtocol(base.BaseProtocol):
         self.max_players = min(32, self.config.get("max_players", 32))
 
         with open(self.config["map"], "rb") as f:
-            self.map: vxl.VXLMap = vxl.VXLMap(f.read())
-            self.map_name =  f.name
+            self.map: vxl.VXLMap = vxl.VXLMap(f.read(), os.path.splitext(f.name)[0])
 
         self.packs: List[Tuple[bytes, int, int]] = []
         for pname in self.config.get("packs", ()):
@@ -35,7 +35,7 @@ class ServerProtocol(base.BaseProtocol):
                 data = f.read()
                 self.packs.append((data, len(data), zlib.crc32(data)))
 
-        self.player_ids = util.IDPool(stop=32)
+        self.player_ids = util.IDPool(stop=self.max_players)
         # Client treats SetColor packets with player IDs >= 32 to be custom, server defined color data to store.
         # BlockAction then can use these player IDs for custom colors.
         self.color_ids = util.IDPool(start=32, stop=255)
@@ -57,8 +57,7 @@ class ServerProtocol(base.BaseProtocol):
         self.sounds: Dict[int, types.Sound] = {}
         self.objects: List[Any] = []
 
-        # TODO: load gamemode from config
-        self.mode: GameMode = tc.TC(self)
+        self.mode: acemodes.GameMode = acemodes.get_game_mode(self, self.config.get("mode", "ctf"))
         self.scripts = acescripts.ScriptLoader(self)
         self.max_respawn_time = 5
 
@@ -173,7 +172,7 @@ class ServerProtocol(base.BaseProtocol):
         predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=CHAT.BIG, predicate=predicate)
 
-    def set_fog_color(self, r, g, b, save=True):
+    def set_fog_color(self, r: int, g: int, b: int, save=True):
         r &= 255
         g &= 255
         b &= 255
@@ -231,7 +230,7 @@ class ServerProtocol(base.BaseProtocol):
         elif data == b'HELLOLAN':
             entry = {
                 "name": self.name, "players_current": len(self.players), "players_max": self.max_players,
-                "map": self.map_name, "game_mode": self.mode.name, "game_version": "1.0a1"
+                "map": self.map.name, "game_mode": self.mode.name, "game_version": "1.0a1"
             }
             payload = json.dumps(entry).encode()
             self.host.socket.send(address, payload)

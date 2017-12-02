@@ -50,10 +50,12 @@ class ServerConnection(base.BaseConnection):
         if data != PROTOCOL_VERSION:
             return await self.disconnect(DISCONNECT.WRONG_VERSION)
 
-        if len(self.protocol.connections) - 1 >= self.protocol.max_players:
+        try:
+            self.id = self.protocol.player_ids.pop()
+        except KeyError:
             return await self.disconnect(DISCONNECT.FULL)
 
-        self.protocol.loop.create_task(self.connection_ack())
+        self.protocol.loop.create_task(self.send_connection_data())
 
     async def on_disconnect(self):
         if self.id is not None:
@@ -89,7 +91,6 @@ class ServerConnection(base.BaseConnection):
         if respawn_task is not None:
             respawn_task.cancel()
 
-
     async def received_loader(self, loader: packets.Loader):
         if self.id is None:
             print(loader)
@@ -114,8 +115,7 @@ class ServerConnection(base.BaseConnection):
         self._listeners[loader.id].append(fut)
         return asyncio.wait_for(fut, timeout, loop=self.protocol.loop)
 
-    async def connection_ack(self):
-        self.id = self.protocol.player_ids.pop()
+    async def send_connection_data(self):
         await self.send_packs()
         await self.send_map()
         await self.send_state()
@@ -143,8 +143,8 @@ class ServerConnection(base.BaseConnection):
         map_start.size = map.estimated_size
         await self.send_loader(map_start)
 
-        for data in map.iter_compressed():
-            map_chunk.data = data
+        for chunk in map.iter_compressed():
+            map_chunk.data = chunk
             await self.send_loader(map_chunk)
 
     async def send_state(self):
@@ -379,7 +379,6 @@ class ServerConnection(base.BaseConnection):
         self.name = self.validate_name(loader.name)
         self.weapon = weapons.WEAPONS[loader.weapon](self)
         self.team = self.protocol.teams[loader.team]
-        # await self.protocol.player_joined(self)
         await self.on_player_join(self)
         await self.spawn()
 
@@ -582,7 +581,7 @@ class ServerConnection(base.BaseConnection):
     on_player_join = util.AsyncEvent()
     # Calls after the player disconnects from the game.
     # (self) -> None
-    on_player_leave = util.AsyncEvent()
+    on_player_leave = on_player_disconnect = util.AsyncEvent()
 
     # Called before/after spawning the player
     # (self, x, y, z) -> None | `x, y, z` to override | False to cancel

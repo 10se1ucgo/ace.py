@@ -26,14 +26,12 @@ COLORS = [
 class DiscoScript(Script):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.protocol.scripts.get("commands").add_commands(self)
         self.protocol.mode.on_game_end += self.on_game_end
 
         self.disco_sound = self.protocol.create_sound("disco", looping=True)
         self.disco_task: asyncio.Task = None
 
     def deinit(self):
-        self.protocol.scripts.get("commands").remove_commands(self)
         if self.disco_task:
             self.disco_task.cancel()
 

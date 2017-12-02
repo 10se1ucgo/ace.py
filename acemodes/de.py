@@ -2,9 +2,10 @@ import asyncio
 from typing import *
 
 from acelib.constants import *
-from acelib.math3d import Vector3
 from acemodes import GameMode
-from aceserver import protocol, connection, types
+from aceserver import types
+from aceserver.protocol import ServerProtocol
+from aceserver.connection import ServerConnection
 
 
 class C4(types.Flag):
@@ -47,7 +48,7 @@ class Defusal(GameMode):
         self.bombsite_a.destroy()
         self.bombsite_b.destroy()
 
-    async def on_pickup_bomb(self, bomb: C4, player: 'connection.ServerConnection'):
+    async def on_pickup_bomb(self, bomb: C4, player: ServerConnection):
         if bomb is not self.bomb: return
 
         if player.team is self.terrorists:
@@ -57,7 +58,7 @@ class Defusal(GameMode):
         elif player.team is self.counter_terrorists and bomb.planter is not None:
             pass # todo
 
-    async def on_site_collide(self, site: types.CommandPost, player: 'connection.ServerConnection'):
+    async def on_site_collide(self, site: types.CommandPost, player: ServerConnection):
         if self.bomb.carrier is not player or player.team is not self.terrorists: return
         if self.bomb.planter: return
 
@@ -66,7 +67,7 @@ class Defusal(GameMode):
                 self.plant_call = self.protocol.loop.create_task(self.delay_plant(player))
             player.store["de_last_plant"] = self.protocol.time
 
-    async def delay_plant(self, player: 'connection.ServerConnection'):
+    async def delay_plant(self, player: ServerConnection):
         x, y, z = player.position.xyz
         for _ in reversed(range(5)):
             await player.set_position(x, y, z)
@@ -76,7 +77,7 @@ class Defusal(GameMode):
             await asyncio.sleep(1)
         await self.plant_bomb(player)
 
-    async def plant_bomb(self, player: 'connection.ServerConnection'):
+    async def plant_bomb(self, player: ServerConnection):
         await self.bomb.set_carrier(None)
         await self.bomb.set_team(player.team)
         await self.bomb.set_position(*player.position.xyz)
@@ -96,7 +97,5 @@ class Defusal(GameMode):
         await self.protocol.broadcast_hud_message("Boom.")
 
 
-                # def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[int, int, int]:
-    #     pos: Vector3 = self.team1_intel.position - Vector3(3, 3, 0)
-    #     pos.z = self.protocol.map.get_z(pos.x, pos.y) - 2
-    #     return pos.xyz
+def init(protocol: ServerProtocol):
+    return Defusal(protocol)

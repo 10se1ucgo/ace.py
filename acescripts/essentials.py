@@ -14,15 +14,6 @@ from acescripts import Script, commands
 
 
 class EssentialsScript(Script):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # TODO is this the best way to add commands?
-        # Perhaps the commands script should check each script for commands by itself.
-        self.protocol.scripts.get("commands").add_commands(self)
-
-    def deinit(self):
-        self.protocol.scripts.get("commands").remove_commands(self)
-
     @commands.command(admin=True)
     async def setpos(self, connection: ServerConnection, x: float, y: float, z: float=None):
         await connection.set_position(x, y, z)
@@ -75,17 +66,6 @@ class EssentialsScript(Script):
     @commands.command(admin=True)
     async def fog(self, connection: ServerConnection, r: int, g: int, b: int):
         await self.protocol.set_fog_color(r, g, b)
-
-    # @commands.command()
-    # async def a(self, connection: ServerConnection, source: str):
-    #     ret = eval(source)
-    #     if inspect.isawaitable(ret):
-    #         ret = await ret
-    #     print(ret)
-    #
-    # @commands.command()
-    # async def b(self, connection: ServerConnection, source: str):
-    #     exec(source)
 
 
 def init(protocol: ServerProtocol):

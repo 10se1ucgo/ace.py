@@ -2,7 +2,7 @@ import importlib
 from typing import Dict
 from collections import OrderedDict
 
-from aceserver import protocol as proto
+from aceserver import util, protocol as proto
 
 
 class Script:
@@ -19,6 +19,8 @@ class ScriptLoader:
     def __init__(self, protocol):
         self.protocol = protocol
         self.scripts: Dict[str, Script] = OrderedDict()
+        self.on_scripts_loaded = util.Event()
+        self.on_scripts_unloaded = util.Event()
 
     def load_scripts(self, reload=False):
         self.unload_scripts()
@@ -31,10 +33,12 @@ class ScriptLoader:
             if not isinstance(script, Script):
                 raise TypeError(f"Script {script_name} did not return a Script instance!")
             self.scripts[script_name] = script
+        self.on_scripts_loaded(self.scripts)
 
     def unload_scripts(self):
         for script in reversed(self.scripts.values()):
             script.deinit()
+        self.on_scripts_unloaded(self.scripts)
         self.scripts = OrderedDict()
 
     def get(self, name: str):

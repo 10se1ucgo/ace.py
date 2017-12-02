@@ -1,7 +1,6 @@
 import asyncio
 import traceback
 import typing
-import time as t
 
 import enet
 
@@ -28,7 +27,7 @@ class BaseProtocol:
         self.host.intercept = self.intercept
         self.connection_factory = connection_factory
 
-        self.connections: typing.Dict[enet.Peer, connection_factory] = {}
+        self.connections: typing.Dict[enet.Peer, BaseConnection] = {}
 
         self.time = 0
         self.running = True
@@ -54,8 +53,8 @@ class BaseProtocol:
     def stop(self):
         self.running = False
         print("Shutting down...")
-        for conn in self.connections:
-            conn.disconnect()
+        for peer in self.connections.keys():
+            peer.disconnect()
         print("Disconnected clients")
         self.host.flush()
         print("Flushed host")
@@ -67,11 +66,11 @@ class BaseProtocol:
         while True:
             try:
                 if self.host is None:
-                    break
+                    return
                 event = self.host.service(0)
                 event_type = event.type
                 if not event or event_type == enet.EVENT_TYPE_NONE:
-                    break
+                    return
 
                 peer = event.peer
                 task = None
@@ -86,6 +85,12 @@ class BaseProtocol:
             except:
                 print("Ignoring exception in net_loop(): ")
                 traceback.print_exc()
+
+    def connect(self, connection_factory: typing.Type[BaseConnection], addr: enet.Address, channels: int, data: int):
+        peer = self.host.connect(addr, channels, data)
+        connection = connection_factory(self, peer)
+        self.connections[peer] = connection
+        return connection
 
     async def on_connect(self, peer: enet.Peer, data: int):
         connection: typing.Optional[BaseConnection] = self.connections.get(peer)

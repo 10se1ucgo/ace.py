@@ -28,13 +28,6 @@ cdef extern from "world_c.cpp" nogil:
 
     bool clipbox(vxl.AceMap *map, float x, float y, float z)
 
-# cdef class World:
-#     cdef public:
-#         VXLMap map
-#         list objects
-#
-#     # cpdef delete_object(self, WorldObject item)
-
 
 cdef class WorldObject:
     cdef public:

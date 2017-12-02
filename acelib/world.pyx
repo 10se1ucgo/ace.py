@@ -9,27 +9,6 @@ def cast_ray(vxl.VXLMap map, math3d.Vector3 pos, math3d.Vector3 dir, double leng
         return False
 
 
-cdef class World:
-    def __init__(self, vxl.VXLMap map):
-        self.map = map
-        self.objects = []
-
-    def update(self, double dt, double time):
-        if self.map is None:
-            return
-        # set_globals(self.map.map, self.time, dt)
-        cdef WorldObject instance
-        for instance in self.objects:
-            instance.update(dt, time)
-    #
-    # cpdef delete_object(self, WorldObject item):
-    #     self.objects.remove(item)
-    #
-    def create_object(self, klass, *arg, **kw):
-        new_object = klass(self, *arg, **kw)
-        self.objects.append(new_object)
-        return new_object
-
 cdef class WorldObject:
     def __init__(self, vxl.VXLMap map, *arg, **kwargs):
         self.map = map

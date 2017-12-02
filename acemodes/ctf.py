@@ -1,11 +1,8 @@
-import asyncio
-import random
-from typing import *
-
 from acelib.constants import KILL
-from acelib.math3d import Vector3
 from acemodes import GameMode
-from aceserver import protocol, connection, types
+from aceserver import types
+from aceserver.protocol import ServerProtocol
+from aceserver.connection import ServerConnection
 
 
 class CTF(GameMode):
@@ -51,7 +48,7 @@ class CTF(GameMode):
     #         await self.protocol.create_entity(ent_type=crate_type, position=pos, team=None)
     #         await asyncio.sleep(10)
 
-    async def on_intel_collide(self, intel: types.Flag, player: 'connection.ServerConnection'):
+    async def on_intel_collide(self, intel: types.Flag, player: ServerConnection):
         if intel.team == player.team:
             return
 
@@ -59,7 +56,7 @@ class CTF(GameMode):
         await self.protocol.broadcast_hud_message(f"{player} picked up the {intel.team} Intel")
         await self.pickup_sound.play()
 
-    async def on_cp_collide(self, base: types.CommandPost, player: 'connection.ServerConnection'):
+    async def on_cp_collide(self, base: types.CommandPost, player: ServerConnection):
         if base.team != player.team:
             return
 
@@ -71,14 +68,14 @@ class CTF(GameMode):
         if intel.carrier == player:
             await self.capture_intel(player, intel)
 
-    async def capture_intel(self, player: 'connection.ServerConnection', intel: types.Flag):
+    async def capture_intel(self, player: ServerConnection, intel: types.Flag):
         await self.reset_intel(intel)
         player.team.score += 1
         player.score += 10
         await self.protocol.broadcast_hud_message(f"{player} captured the {intel.team} Intel")
         self.check_win()
 
-    async def drop_intel(self, player: 'connection.ServerConnection', intel: types.Flag):
+    async def drop_intel(self, player: ServerConnection, intel: types.Flag):
         await intel.set_carrier(None)
         await intel.set_position(*player.position.xyz)
         await self.protocol.broadcast_hud_message(f"{player} dropped the {intel.team} Intel")
@@ -87,8 +84,12 @@ class CTF(GameMode):
         await intel.set_carrier(None)
         await intel.set_position(*self.get_random_pos(intel.team))
 
-    async def on_player_kill(self, player: 'connection.ServerConnection', kill_type: KILL, killer: 'connection.ServerConnection'):
+    async def on_player_kill(self, player: ServerConnection, kill_type: KILL, killer: ServerConnection):
         await super().on_player_kill(player, kill_type, killer)
         intel = self.intels[player.team.other]
         if intel.carrier == player:
             await self.drop_intel(player, intel)
+
+
+def init(protocol: ServerProtocol):
+    return CTF(protocol)

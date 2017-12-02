@@ -1,4 +1,4 @@
-import asyncio
+import importlib
 from typing import Tuple
 
 from acelib import constants
@@ -6,12 +6,11 @@ from aceserver import protocol, connection, types, util
 
 
 class GameMode:
-    name = "Default"
+    name: str = "Default"
 
     @property
-    def score_limit(self):
+    def score_limit(self) -> int:
         return self.config.get("score_limit", 10)
-
 
     def __init__(self, protocol: 'protocol.ServerProtocol'):
         self.protocol = protocol
@@ -70,7 +69,7 @@ class GameMode:
         x, y, z = self.get_random_pos(player.team)
         return x + 0.5, y + 0.5, z - 2
 
-    def get_random_pos(self, team):
+    def get_random_pos(self, team) -> Tuple[int, int, int]:
         sections = self.protocol.map.width() / 8
         offset = team.id * (self.protocol.map.width() - (sections * 2))
         x, y, z = self.protocol.map.get_random_pos(0 + offset, 0, (sections * 2) + offset, self.protocol.map.width())
@@ -78,3 +77,11 @@ class GameMode:
 
     # Hooks
     on_game_end = util.AsyncEvent()
+
+
+def get_game_mode(protocol: 'protocol.ServerProtocol', mode_name: str):
+    module = importlib.import_module(f"acemodes.{mode_name}")
+    mode = module.init(protocol)
+    if not isinstance(mode, GameMode):
+        raise TypeError(f"Mode {mode_name} did not return a GameMode instance!")
+    return mode

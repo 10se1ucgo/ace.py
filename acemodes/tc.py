@@ -2,13 +2,12 @@ import asyncio
 import random
 from typing import *
 
-import enet
-
-from acelib.constants import *
-from acelib.math3d import Vector3
 from acemodes import GameMode
-from aceserver import protocol, connection, types, util
+from aceserver import types, util
+from aceserver.protocol import ServerProtocol
+from aceserver.connection import ServerConnection
 from aceserver.loaders import progress_bar
+
 
 
 DEFAULT_CAPTURE_DISTANCE = 16
@@ -171,8 +170,13 @@ class TC(GameMode):
         grid = self.protocol.map.to_grid(territory.position.x, territory.position.y)
         await self.protocol.broadcast_hud_message(f"{capturing.name} team is capturing {grid}")
 
-    def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[int, int, int]:
+    def get_spawn_point(self, player: ServerConnection) -> Tuple[int, int, int]:
         # TODO: maybe choose the controlled Territory closest to the enemy side?
         t: Territory = random.choice([t for t in self.territories if t.team is player.team])
         x, y, z = t.get_spawn_location()
         return x + 0.5, y + 0.5, z - 2
+
+
+def init(protocol: ServerProtocol):
+    return TC(protocol)
+

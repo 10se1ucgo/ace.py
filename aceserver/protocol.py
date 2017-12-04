@@ -27,7 +27,7 @@ class ServerProtocol(base.BaseProtocol):
         self.max_players = min(32, self.config.get("max_players", 32))
 
         with open(self.config["map"], "rb") as f:
-            self.map: vxl.VXLMap = vxl.VXLMap(f.read(), os.path.splitext(f.name)[0])
+            self.map: vxl.VXLMap = vxl.VXLMap(f.read(), {"name": os.path.splitext(f.name)[0]})
 
         self.packs: List[Tuple[bytes, int, int]] = []
         for pname in self.config.get("packs", ()):

@@ -15,6 +15,9 @@ class Tool:
     primary_rate: float = 0
     secondary_rate: float = 0
 
+    last_primary: float = 0
+    last_secondary: float = 0
+
     def __init__(self, connection: 'connection.ServerConnection'):
         self.connection = connection
         self.next_primary = connection.protocol.time
@@ -58,13 +61,34 @@ class Tool:
         self.primary_ammo = self.max_primary  # bug? client seems to think it should
         self.secondary_ammo = self.max_secondary
 
+    def check_rapid(self, primary=True, times=1):
+        # this is awful i know
+        type = "primary" if primary else "secondary"
+        time = self.connection.protocol.time
+
+        last_use = getattr(self, "last_" + type)
+        setattr(self, "last_" + type, time)
+        rate = (getattr(self, type + "_rate") * times) - 0.025  # TODO random constants REEEE
+
+        if time - last_use < rate:
+            return False
+        return True
+
     def reset(self):
         pass
 
 
+class Spade(Tool):
+    primary_rate = 0.2
+    secondary_rate = 1.0
+
+
 class Block(Tool):
     type = TOOL.BLOCK
+
     max_primary = 50
+
+    primary_rate = 0.5
 
     def __init__(self, connection: 'connection.ServerConnection'):
         super().__init__(connection)
@@ -165,6 +189,7 @@ class Weapon(Tool):
     def get_damage(self, area, distance=0):
         if not self.primary or self.reloading:
             return None
+
         clip_tolerance = int(self.max_primary * 0.3)
         if self.primary_ammo + clip_tolerance <= 0:
             return None

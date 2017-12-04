@@ -10,6 +10,7 @@ import itertools
 from aceserver import types
 from aceserver.protocol import ServerProtocol
 from aceserver.connection import ServerConnection
+from acemodes import GameMode
 from acescripts import Script, commands
 
 
@@ -26,7 +27,7 @@ COLORS = [
 class DiscoScript(Script):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.protocol.mode.on_game_end += self.on_game_end
+        GameMode.on_game_end += self.on_game_end
 
         self.disco_sound = self.protocol.create_sound("disco", looping=True)
         self.disco_task: asyncio.Task = None

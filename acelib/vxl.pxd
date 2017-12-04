@@ -37,7 +37,7 @@ cdef class VXLMap:
     cdef AceMap *map_data
     cdef public:
         int estimated_size
-        str name
+        dict map_info
 
     cpdef bint can_build(self, int x, int y, int z)
 

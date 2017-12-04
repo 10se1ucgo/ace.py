@@ -6,16 +6,17 @@ VXL_MAP_Y = MAP_Y
 VXL_MAP_Z = MAP_Z
 VXL_DEFAULT_COLOR = DEFAULT_COLOR
 
+
 cdef class VXLMap:
-    def __cinit__(self, uint8_t *buffer=NULL, str name="unknown"):
+    def __cinit__(self, uint8_t *buffer=NULL, dict map_info=None):
         self.map_data = new AceMap(buffer)
         self.estimated_size = len(buffer)
-        self.name = name
+        self.map_info = map_info or {}
 
     def __dealloc__(self):
         del self.map_data
 
-    def __init__(self, uint8_t *buffer=NULL, str name="unknown"):
+    def __init__(self, uint8_t *buffer=NULL, dict map_info=None):
         # just to make my ide happy LUL
         pass
 
@@ -45,7 +46,7 @@ cdef class VXLMap:
         yield data
 
     cpdef bint can_build(self, int x, int y, int z):
-        return x < MAP_X and y < MAP_Y and z < MAP_Z - 2
+        return  0 <= x < MAP_X and 0 <= y < MAP_Y and 0 <= z < MAP_Z - 2
         # if not x < MAP_X and y < MAP_Y and z < MAP_Z - 2:
         #     return False
         # cdef vector[Pos3] neighbors = self.map_data.get_neighbors(x, y, z)
@@ -57,8 +58,9 @@ cdef class VXLMap:
         if not destroy:
             return ok
 
-        cdef vector[Pos3] neighbors = self.map_data.get_neighbors(x, y, z)
-        cdef Pos3 node
+        cdef:
+            vector[Pos3] neighbors = self.map_data.get_neighbors(x, y, z)
+            Pos3 node
         for node in neighbors:
             if self.can_build(node.x, node.y, node.z):
                 self.map_data.check_node(node.x, node.y, node.z, True)
@@ -86,8 +88,8 @@ cdef class VXLMap:
         return MAP_Z
 
     def to_grid(self, x: double, y: double):
-        letter = chr(ord('A') + int(x / 64))
-        number = str(int(y / 64) + 1)
+        letter = chr(ord('A') + x // 64)
+        number = str(y // 64 + 1)
         return letter + number
 
     def from_grid(self, grid: str):
@@ -100,5 +102,7 @@ cdef class VXLMap:
     def __bytes__(self):
         return self.get_bytes()
 
-
+    @property
+    def name(self):
+        return self.map_info["name"]
 

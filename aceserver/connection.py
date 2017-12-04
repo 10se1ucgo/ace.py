@@ -37,7 +37,7 @@ class ServerConnection(base.BaseConnection):
 
         self.weapon = weapons.Weapon(self)
         self.block = weapons.Block(self)
-        self.spade = weapons.Tool(self)
+        self.spade = weapons.Spade(self)
         self.grenade = weapons.Grenade(self)
         self.tool_type = TOOL.WEAPON
 
@@ -258,6 +258,9 @@ class ServerConnection(base.BaseConnection):
 
         to_destroy = [(x, y, z)]
         if destroy_type == ACTION.SPADE and self.tool_type == TOOL.SPADE:
+            if not self.spade.check_rapid(primary=False):
+                return False
+
             to_destroy.extend(((x, y, z - 1), (x, y, z + 1)))
         elif destroy_type == ACTION.GRENADE:
             for ax in range(x - 1, x + 2):
@@ -265,6 +268,8 @@ class ServerConnection(base.BaseConnection):
                     for az in range(z - 1, z + 2):
                         to_destroy.append((ax, ay, az))
         elif destroy_type == ACTION.DESTROY:
+            if not self.tool.check_rapid(primary=True, times=2):
+                return False
             self.block.destroy()
 
         for ax, ay, az in to_destroy:
@@ -283,6 +288,9 @@ class ServerConnection(base.BaseConnection):
             return False
 
         if not self.block.build():
+            return False
+
+        if not self.block.check_rapid():
             return False
 
         if color is not None:
@@ -504,6 +512,9 @@ class ServerConnection(base.BaseConnection):
         if self.tool_type != TOOL.WEAPON or not self.tool.primary:
             return
 
+        if not self.weapon.check_rapid():
+            return
+
         # TODO our own raycasting and hack detection etc.
         other = self.protocol.players.get(loader.player_id)
         if other is None:
@@ -511,7 +522,7 @@ class ServerConnection(base.BaseConnection):
 
         vec = (other.eye - self.eye).normalized
         if self.orientation.dot(vec) <= 0.9:
-            print("incorrect orientation to hit")
+            print(f"incorrect orientation to hit for {self!r}")
             print(f"self.pos={self.position} other.pos={other.position}")
             print(f"self.orien={self.orientation} expected={vec}")
             return
@@ -578,13 +589,15 @@ class ServerConnection(base.BaseConnection):
 
 
     # TODO more hooks
+    # Called after the player connects to the server (after being sent packs, map, game state, etc.)
+    # (self) -> None
     on_player_connect = util.AsyncEvent()
 
 
-    # Called after the player joins the game
+    # Called after the player joins the game (first time spawning)
     # (self) -> None
     on_player_join = util.AsyncEvent()
-    # Calls after the player disconnects from the game.
+    # Calls after the player leaves from the game.
     # (self) -> None
     on_player_leave = on_player_disconnect = util.AsyncEvent()
 

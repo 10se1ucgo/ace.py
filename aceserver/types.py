@@ -4,7 +4,7 @@ from typing import Generator
 from acelib import math3d, packets, world
 from acelib.constants import TEAM, SET, ENTITY, SCORE, KILL, ACTION, ROCKET_SPEED, ROCKET_FALLOFF, TOOL
 from aceserver import protocol, connection, util, loaders
-from aceserver.loaders import play_sound, stop_sound, change_entity, grenade_packet, rpg_packet
+from aceserver.loaders import play_sound, stop_sound, change_entity, oriented_item
 
 
 class Sound:
@@ -279,11 +279,12 @@ class Grenade(Explosive):
         return self.wo.next_collision(dt, max)
 
     async def broadcast_item(self, predicate=None):
-        grenade_packet.player_id = self.thrower.id
-        grenade_packet.value = self.fuse
-        grenade_packet.position.xyz = self.wo.position.xyz
-        grenade_packet.velocity.xyz = self.wo.velocity.xyz
-        await self.protocol.broadcast_loader(grenade_packet, predicate=predicate)
+        oriented_item.player_id = self.thrower.id
+        oriented_item.value = self.fuse
+        oriented_item.position.xyz = self.wo.position.xyz
+        oriented_item.velocity.xyz = self.wo.velocity.xyz
+        oriented_item.tool = TOOL.GRENADE
+        await self.protocol.broadcast_loader(oriented_item, predicate=predicate)
 
     @property
     def fuse(self):
@@ -351,8 +352,9 @@ class Rocket(Explosive):
     # a1 client is bork, assumes all UseOrientedItem packets are grenades.
     # (this is fixed in later builds)
     async def broadcast_item(self, predicate=None):
-        rpg_packet.player_id = self.thrower.id
-        rpg_packet.value = 0
-        rpg_packet.position.xyz = self.wo.position.xyz
-        rpg_packet.velocity.xyz = self.get_orientation()
-        await self.protocol.broadcast_loader(rpg_packet, predicate=predicate)
+        oriented_item.player_id = self.thrower.id
+        oriented_item.value = 0
+        oriented_item.position.xyz = self.wo.position.xyz
+        oriented_item.velocity.xyz = self.get_orientation()
+        oriented_item.tool = TOOL.RPG
+        await self.protocol.broadcast_loader(oriented_item, predicate=predicate)

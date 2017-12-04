@@ -128,15 +128,20 @@ class ServerConnection(base.BaseConnection):
             pack_start.size = length
             await self.send_loader(pack_start)
 
-            response: packets.PackResponse = await self.wait_for(packets.PackResponse)
-            if not response.value:  # client does NOT have pack cached
-                with io.BytesIO(data) as f:
-                    while True:
-                        data = f.read(1024)
-                        if not data:
-                            break
-                        pack_chunk.data = data
-                        await self.send_loader(pack_chunk)
+            try:
+                has_pack: bool = (await self.wait_for(packets.PackResponse, 3)).value
+            except asyncio.TimeoutError:
+                continue
+            if has_pack:  # client has pack cached
+                continue
+
+            with io.BytesIO(data) as f:
+                while True:
+                    data = f.read(1024)
+                    if not data:
+                        break
+                    pack_chunk.data = data
+                    await self.send_loader(pack_chunk)
 
     async def send_map(self):
         map = self.protocol.map

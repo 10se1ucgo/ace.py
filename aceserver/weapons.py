@@ -63,6 +63,7 @@ class Tool:
 
 
 class Block(Tool):
+    type = TOOL.BLOCK
     max_primary = 50
 
     def __init__(self, connection: 'connection.ServerConnection'):
@@ -93,6 +94,7 @@ class Block(Tool):
 
 
 class Weapon(Tool):
+    type = TOOL.WEAPON
     reload_time = 0
     one_by_one = False
 
@@ -250,6 +252,7 @@ WEAPONS = {cls.type: cls for cls in Weapon.__subclasses__()}
 
 
 class Grenade(Tool):
+    type = TOOL.GRENADE
     max_primary = 3
 
     # max_fuse = 3

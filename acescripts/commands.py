@@ -9,10 +9,11 @@ import inspect
 import traceback
 from typing import Dict, Callable
 
-from acelib.constants import CHAT, ENTITY
+from acelib.constants import CHAT, ENTITY, WEAPON
 from aceserver.protocol import ServerProtocol
 from aceserver.connection import ServerConnection
 from aceserver.types import Entity, ENTITIES
+from aceserver.weapons import Weapon, WEAPONS
 from acescripts import Script
 
 
@@ -88,9 +89,11 @@ class CommandsScript(Script):
         super().__init__(*args, **kwargs)
         self.commands: Dict[str, Command] = {}
         self.command_prefix = self.config.get("command_prefix", self.COMMAND_PREFIX)
+        self.local_is_admin = self.config.get("local_is_admin", True)
         self.roles = self.config.get("roles", {})
 
         ServerConnection.try_chat_message += self.try_chat_message
+        ServerConnection.on_player_connect += self.on_player_connect
         self.protocol.scripts.on_scripts_loaded += self.on_scripts_loaded
         self.add_commands(self)  # ha
 
@@ -134,6 +137,10 @@ class CommandsScript(Script):
             traceback.print_exc()
         return False
 
+    async def on_player_connect(self, connection: ServerConnection):
+        if connection.peer.address.host == "127.0.0.1":
+            connection.store["commands_admin"] = True
+
     @command()
     async def login(self, connection: ServerConnection, password: str):
         if password in self.config.get("admin_passwords", ()):
@@ -169,17 +176,26 @@ def to_connection(conn: ServerConnection, parameter: str) -> ServerConnection:
     return ply
 
 
-@register_converter(Entity)
-def to_entity(conn: ServerConnection, parameter: str) -> ServerConnection:
+def _to_type_from_enum(enum, types, parameter):
     try:
         try:
-            type = ENTITY[parameter.upper()]
+            type = enum[parameter.upper()]
         except KeyError:
-            type = ENTITY(int(parameter))
-        return ENTITIES.get(type)
+            type = enum(int(parameter))
+        return types.get(type)
     except ValueError:
-        names = {cls.__name__.lower(): cls for cls in ENTITIES.values()}
+        names = {cls.__name__.lower(): cls for cls in types.values()}
         return names.get(parameter.lower())
+
+
+@register_converter(Entity)
+def to_entity(conn: ServerConnection, parameter: str) -> Entity:
+    return _to_type_from_enum(ENTITY, ENTITIES, parameter)
+
+
+@register_converter(Weapon)
+def to_entity(conn: ServerConnection, parameter: str) -> Weapon:
+    return _to_type_from_enum(WEAPON, WEAPONS, parameter)
 
 
 def can_invoke(connection: ServerConnection, command: Command):

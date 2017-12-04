@@ -1,23 +1,18 @@
 from acelib import packets
-from acelib.constants import TOOL
 
 __all__ = [
-    "create_player", "position_data", "orientation_data", "input_data", "rpg_packet", "grenade_packet",
-    "set_tool", "set_color", "fog_color", "existing_player", "player_left", "server_block_action", "block_action",
-    "kill_action", "chat_message", "map_start", "map_chunk", "pack_start", "pack_chunk", "state_data",
-    "create_entity", "change_entity", "destroy_entity", "restock", "set_hp", "change_weapon", "change_team",
-    "weapon_reload", "progress_bar", "world_update", "block_line", "weapon_input", "set_score",
-    "play_sound", "stop_sound"
+    "create_player", "position_data", "orientation_data", "input_data", "oriented_item", "set_tool", "set_color",
+    "fog_color", "existing_player", "player_left", "server_block_action", "block_action", "kill_action", "chat_message",
+    "map_start", "map_chunk", "pack_start", "pack_chunk", "state_data", "create_entity", "change_entity",
+    "destroy_entity", "restock", "set_hp", "change_weapon", "change_team", "weapon_reload", "progress_bar",
+    "world_update", "block_line", "weapon_input", "set_score", "play_sound", "stop_sound"
 ]
 
 create_player = packets.CreatePlayer()
 position_data = packets.PositionData()
 orientation_data = packets.OrientationData()
 input_data = packets.InputData()
-rpg_packet = packets.UseOrientedItem()
-rpg_packet.tool = TOOL.RPG
-grenade_packet = packets.UseOrientedItem()
-grenade_packet.tool = TOOL.GRENADE
+oriented_item = packets.UseOrientedItem()
 set_tool = packets.SetTool()
 set_color = packets.SetColor()
 fog_color = packets.FogColor()

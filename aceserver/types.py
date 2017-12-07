@@ -100,6 +100,7 @@ class Entity:
         self.protocol = protocol
 
         self.position = math3d.Vector3(*position)
+        self.yaw = 0
         self.team: Team = team
         self.carrier: connection.ServerConnection = carrier
 
@@ -170,6 +171,7 @@ class Entity:
             return
         ent = packets.Entity()
         ent.position.xyz = self.position.xyz
+        ent.yaw = self.yaw
         ent.id = self.id
         ent.type = self.type
         ent.carrier = -1 if self.carrier is None else self.carrier.id

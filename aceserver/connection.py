@@ -351,29 +351,20 @@ class ServerConnection(base.BaseConnection):
     def send_hud_message(self, message: str):
         return self.send_message(message, chat_type=CHAT.BIG)
 
-    @on_loader_receive(packets.PositionData)
-    async def recv_position_data(self, loader: packets.PositionData):
+    @on_loader_receive(packets.PositionOrientationData)
+    async def recv_client_update(self, loader: packets.PositionOrientationData):
         if self.dead: return
 
-        x, y, z = loader.data.xyz
-        if util.bad_float(x, y, z):
+        px, py, pz = loader.data.p.xyz
+        ox, oy, oz = loader.data.o.xyz
+        if util.bad_float(px, py, pz, ox, oy, oz):
             return await self.disconnect()
 
-        pos: math3d.Vector3 = math3d.Vector3(x, y, z)
-        if pos.sq_distance(self.wo.position) >= 3 ** 2:
+        if math3d.Vector3(px, py, pz).sq_distance(self.wo.position) >= 3 ** 2:
             await self.set_position(reset=False)
         else:
-            self.wo.set_position(x, y, z)
-
-    @on_loader_receive(packets.OrientationData)
-    async def recv_orientation_data(self, loader: packets.OrientationData):
-        if self.dead: return
-
-        x, y, z = loader.data.xyz
-        if util.bad_float(x, y, z):
-            return await self.disconnect()
-
-        self.wo.set_orientation(x, y, z)
+            self.wo.set_position(px, py, pz)
+        self.wo.set_orientation(ox, oy, oz)
 
     @on_loader_receive(packets.InputData)
     async def recv_input_data(self, loader: packets.InputData):

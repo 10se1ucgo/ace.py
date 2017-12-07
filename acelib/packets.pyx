@@ -80,8 +80,24 @@ cdef class Loader:
         return writer
 
 
-cdef class PositionData(Loader):
+cdef class InitialInfo(Loader):
     id: int = 0
+
+    cdef public:
+        str mode_name, mode_description
+
+    cpdef read(self, ByteReader reader):
+        # apparently these are unicode, which means everything else probably is too.
+        self.mode_name = reader.read_bytes().decode("utf8")
+        self.mode_description = reader.read_bytes().decode("utf8")
+
+    cpdef write(self, ByteWriter writer):
+        writer.write_uint8(self.id)
+        writer.write_bytes(self.mode_name.encode("utf8"))
+        writer.write_bytes(self.mode_description.encode("utf8"))
+
+cdef class PositionData(Loader):
+    id: int = 1
 
     cdef public:
         Pos3f data
@@ -97,11 +113,7 @@ cdef class PositionData(Loader):
         self.data.write(writer)
 
 
-cdef class OrientationData(PositionData):
-    id: int = 1
-
-
-cdef class WorldUpdateData:
+cdef class ClientUpdateData:
     cdef public:
         Pos3f p, o
 
@@ -118,8 +130,25 @@ cdef class WorldUpdateData:
         self.o.write(writer)
 
 
-cdef class WorldUpdate(Loader):
+cdef class PositionOrientationData(Loader):
     id: int = 2
+
+    cdef public:
+        ClientUpdateData data
+
+    def __cinit__(self):
+        self.data = Pos3f()
+
+    cpdef read(self, ByteReader reader):
+        self.data.read(reader)
+
+    cpdef write(self, ByteWriter writer):
+        writer.write_uint8(self.id)
+        self.data.write(writer)
+
+
+cdef class WorldUpdate(Loader):
+    id: int = 3
 
     cdef:
         dict data
@@ -131,28 +160,28 @@ cdef class WorldUpdate(Loader):
 
         while reader.data_left():
             p_id = reader.read_uint8()
-            self.data[p_id] = WorldUpdateData().read(reader)
+            self.data[p_id] = ClientUpdateData().read(reader)
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
 
         cdef:
             uint8_t player_id
-            WorldUpdateData wud
+            ClientUpdateData cud
 
-        for player_id, wud in self.data.items():
+        for player_id, cud in self.data.items():
             writer.write_uint8(player_id)
-            wud.write(writer)
+            cud.write(writer)
 
     def clear(self):
         self.data = {}
 
     def __setitem__(self, uint8_t key, value):
-        self.data[key] = WorldUpdateData(*value[0], *value[1])
+        self.data[key] = ClientUpdateData(*value[0], *value[1])
 
 
 cdef class InputData(Loader):
-    id: int = 3
+    id: int = 4
 
     cdef public:
         uint8_t player_id
@@ -189,7 +218,7 @@ cdef class InputData(Loader):
 
 
 cdef class WeaponInput(Loader):
-    id: int = 4
+    id: int = 5
 
     cdef public:
         uint8_t player_id
@@ -211,7 +240,7 @@ cdef class WeaponInput(Loader):
 
 
 cdef class HitPacket(Loader):
-    id: int = 5
+    id: int = 6
 
     cdef public:
         uint8_t player_id, value
@@ -227,7 +256,7 @@ cdef class HitPacket(Loader):
 
 
 cdef class SetHP(Loader):
-    id: int = 5
+    id: int = 6
 
     cdef public:
         uint8_t hp, type
@@ -249,7 +278,7 @@ cdef class SetHP(Loader):
 
 
 cdef class UseOrientedItem(Loader):
-    id: int = 6
+    id: int = 7
 
     cdef public:
         uint8_t player_id, tool
@@ -277,7 +306,7 @@ cdef class UseOrientedItem(Loader):
 
 
 cdef class SetTool(Loader):
-    id: int = 7
+    id: int = 8
 
     cdef public:
         uint8_t player_id, value
@@ -293,7 +322,7 @@ cdef class SetTool(Loader):
 
 
 cdef class SetColor(Loader):
-    id: int = 8
+    id: int = 9
 
     cdef public:
         uint8_t player_id
@@ -313,7 +342,7 @@ cdef class SetColor(Loader):
 
 
 cdef class ExistingPlayer(Loader):
-    id: int = 9
+    id: int = 10
 
     cdef public:
         uint8_t player_id, weapon, tool
@@ -332,7 +361,7 @@ cdef class ExistingPlayer(Loader):
         self.tool = reader.read_uint8()
         self.kills = reader.read_uint32()
         self.color.read(reader)
-        self.name = reader.read_bytes().decode("cp437")
+        self.name = reader.read_bytes().decode("utf8")
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
@@ -342,11 +371,11 @@ cdef class ExistingPlayer(Loader):
         writer.write_uint8(self.tool)
         writer.write_uint32(self.kills)
         self.color.write(writer)
-        writer.write_bytes(self.name.encode("cp437"))
+        writer.write_bytes(self.name.encode("utf8"))
 
 
 cdef class ShortPlayerData(Loader):
-    id: int = 10
+    id: int = 11
 
     cdef public:
         uint8_t player_id, weapon
@@ -389,7 +418,7 @@ cdef class Entity(Loader):
 
 
 cdef class ChangeEntity(Loader):
-    id: int = 11
+    id: int = 12
 
     cdef public:
         # yes, this is basically Entity, except `type` is the action to perform on the entity, not the Entity type.
@@ -424,7 +453,7 @@ cdef class ChangeEntity(Loader):
 
 
 cdef class DestroyEntity(Loader):
-    id: int = 12
+    id: int = 13
 
     cdef public:
         uint8_t entity_id
@@ -441,7 +470,7 @@ cdef class DestroyEntity(Loader):
 
 
 cdef class CreateEntity(Loader):
-    id: int = 13
+    id: int = 14
 
     cdef public:
         Entity entity
@@ -463,7 +492,7 @@ cdef class CreateEntity(Loader):
 
 
 cdef class PlaySound(Loader):
-    id: int = 14
+    id: int = 15
 
     cdef public:
         str name
@@ -475,7 +504,7 @@ cdef class PlaySound(Loader):
         self.position = Pos3f()
 
     cpdef read(self, ByteReader reader):
-        self.name = reader.read_bytes().decode("cp437")
+        self.name = reader.read_bytes().decode("utf8")
 
         cdef uint8_t flags = reader.read_uint8()
         self.looping    = flags & (1 << 0)
@@ -488,7 +517,7 @@ cdef class PlaySound(Loader):
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
-        writer.write_bytes(self.name.encode("cp437"))
+        writer.write_bytes(self.name.encode("utf8"))
 
         cdef int sound_flags = <bool>self.looping << 0 | <bool>self.positioned << 1
         writer.write_uint8(sound_flags)
@@ -500,7 +529,7 @@ cdef class PlaySound(Loader):
 
 
 cdef class StopSound(Loader):
-    id: int = 15
+    id: int = 16
 
     cdef public:
         uint8_t loop_id
@@ -514,7 +543,7 @@ cdef class StopSound(Loader):
 
 
 cdef class CreatePlayer(Loader):
-    id: int = 16
+    id: int = 17
 
     cdef public:
         uint8_t player_id, weapon
@@ -530,7 +559,7 @@ cdef class CreatePlayer(Loader):
         self.weapon = reader.read_uint8()
         self.team = reader.read_int8()
         self.position.read(reader)
-        self.name = reader.read_bytes().decode("cp437")
+        self.name = reader.read_bytes().decode("utf8")
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
@@ -538,11 +567,11 @@ cdef class CreatePlayer(Loader):
         writer.write_uint8(self.weapon)
         writer.write_int8(self.team)
         self.position.write(writer)
-        writer.write_bytes(self.name.encode("cp437"))
+        writer.write_bytes(self.name.encode("utf8"))
 
 
 cdef class BlockAction(Loader):
-    id: int = 17
+    id: int = 18
 
     cdef public:
         uint8_t player_id, value
@@ -606,7 +635,7 @@ cdef class ServerBlockItem(Loader):
 
 
 cdef class ServerBlockAction(Loader):
-    id: int = 18
+    id: int = 19
 
     cdef public:
         list items
@@ -643,7 +672,7 @@ cdef class ServerBlockAction(Loader):
 
 
 cdef class BlockLine(Loader):
-    id: int = 19
+    id: int = 20
 
     cdef public:
         uint8_t player_id
@@ -686,7 +715,7 @@ cdef class BlockLine(Loader):
 
 
 cdef class StateData(Loader):
-    id: int = 20
+    id: int = 21
 
     cdef public:
         uint8_t player_id
@@ -709,9 +738,9 @@ cdef class StateData(Loader):
         self.team1_score = reader.read_uint8()
         self.team2_score = reader.read_uint8()
         self.score_limit = reader.read_uint8()
-        self.team1_name = reader.read_bytes().decode("cp437")
-        self.team2_name = reader.read_bytes().decode("cp437")
-        self.mode_name = reader.read_bytes().decode("cp437")
+        self.team1_name = reader.read_bytes().decode("utf8")
+        self.team2_name = reader.read_bytes().decode("utf8")
+        self.mode_name = reader.read_bytes().decode("utf8")
         while reader.data_left():
             self.entities.append(Entity(reader))
 
@@ -724,9 +753,9 @@ cdef class StateData(Loader):
         writer.write_uint8(self.team1_score)
         writer.write_uint8(self.team2_score)
         writer.write_uint8(self.score_limit)
-        writer.write_bytes(self.team1_name.encode("cp437"))
-        writer.write_bytes(self.team2_name.encode("cp437"))
-        writer.write_bytes(self.mode_name.encode("cp437"))
+        writer.write_bytes(self.team1_name.encode("utf8"))
+        writer.write_bytes(self.team2_name.encode("utf8"))
+        writer.write_bytes(self.mode_name.encode("utf8"))
         for ent in self.entities:
             ent.write(writer)
 
@@ -738,7 +767,7 @@ cdef class StateData(Loader):
 
 
 cdef class KillAction(Loader):
-    id: int = 21
+    id: int = 22
 
     cdef public:
         uint8_t player_id, killer_id, kill_type, respawn_time
@@ -758,7 +787,7 @@ cdef class KillAction(Loader):
 
 
 cdef class ChatMessage(Loader):
-    id: int = 22
+    id: int = 23
 
     cdef public:
         uint8_t player_id, chat_type
@@ -767,17 +796,17 @@ cdef class ChatMessage(Loader):
     cpdef read(self, ByteReader reader):
         self.player_id = reader.read_uint8()
         self.chat_type = reader.read_uint8()
-        self.value = reader.read_bytes().decode("cp437")
+        self.value = reader.read_bytes().decode("utf8")
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
         writer.write_uint8(self.player_id)
         writer.write_uint8(self.chat_type)
-        writer.write_bytes(self.value.encode("cp437"))
+        writer.write_bytes(self.value.encode("utf8"))
 
 
 cdef class MapStart(Loader):
-    id: int = 23
+    id: int = 24
 
     cdef public:
         uint32_t size
@@ -791,7 +820,7 @@ cdef class MapStart(Loader):
 
 
 cdef class MapChunk(Loader):
-    id: int = 24
+    id: int = 25
 
     cdef public:
         bytes data
@@ -805,7 +834,7 @@ cdef class MapChunk(Loader):
 
 
 cdef class PackStart(Loader):
-    id: int = 25
+    id: int = 26
 
     cdef public:
         uint32_t size, checksum
@@ -821,7 +850,7 @@ cdef class PackStart(Loader):
 
 
 cdef class PackResponse(Loader):
-    id: int = 26
+    id: int = 27
 
     cdef public:
         bint value
@@ -835,7 +864,7 @@ cdef class PackResponse(Loader):
 
 
 cdef class PackChunk(Loader):
-    id: int = 27
+    id: int = 28
 
     cdef public:
         bytes data
@@ -849,7 +878,7 @@ cdef class PackChunk(Loader):
 
 
 cdef class PlayerLeft(Loader):
-    id: int = 28
+    id: int = 29
 
     cdef public:
         uint8_t player_id
@@ -863,7 +892,7 @@ cdef class PlayerLeft(Loader):
 
 
 cdef class ProgressBar(Loader):
-    id: int = 29
+    id: int = 30
 
     cdef public:
         float progress, rate
@@ -907,7 +936,7 @@ cdef class ProgressBar(Loader):
 
 
 cdef class Restock(Loader):
-    id: int = 30
+    id: int = 31
 
     cdef public:
         uint8_t player_id
@@ -921,7 +950,7 @@ cdef class Restock(Loader):
 
 
 cdef class FogColor(Loader):
-    id: int = 31
+    id: int = 32
 
     cdef public:
         Color color
@@ -940,7 +969,7 @@ cdef class FogColor(Loader):
 
 
 cdef class WeaponReload(Loader):
-    id: int = 32
+    id: int = 33
 
     cdef public:
         uint8_t player_id, clip_ammo, reserve_ammo
@@ -958,7 +987,7 @@ cdef class WeaponReload(Loader):
 
 
 cdef class ChangeTeam(Loader):
-    id: int = 33
+    id: int = 34
 
     cdef public:
         uint8_t player_id
@@ -974,24 +1003,24 @@ cdef class ChangeTeam(Loader):
         writer.write_int8(self.team)
 
 
-cdef class ChangeWeapon(Loader):
-    id: int = 34
+cdef class ChangeClass(Loader):
+    id: int = 35
 
     cdef public:
-        uint8_t player_id, weapon
+        uint8_t player_id, class_id
 
     cpdef read(self, ByteReader reader):
         self.player_id = reader.read_uint8()
-        self.weapon = reader.read_uint8()
+        self.class_id = reader.read_uint8()
 
     cpdef write(self, ByteWriter reader):
         reader.write_uint8(self.id)
         reader.write_uint8(self.player_id)
-        reader.write_uint8(self.weapon)
+        reader.write_uint8(self.class_id)
 
 
 cdef class SetScore(Loader):
-    id: int = 35
+    id: int = 36
 
     cdef public:
         uint8_t type, specifier
@@ -1009,45 +1038,38 @@ cdef class SetScore(Loader):
         reader.write_uint16(self.value)
 
 
-LOADERS = [
-    PositionData,
-    OrientationData,
-    WorldUpdate,
-    InputData,
-    WeaponInput,
-    HitPacket,
-    SetHP,
-    UseOrientedItem,
-    SetTool,
-    SetColor,
-    ExistingPlayer,
-    ShortPlayerData,
-    ChangeEntity,
-    DestroyEntity,
-    CreateEntity,
-    PlaySound,
-    StopSound,
-    CreatePlayer,
-    BlockAction,
-    ServerBlockAction,
-    BlockLine,
-    StateData,
-    KillAction,
-    ChatMessage,
-    MapStart,
-    MapChunk,
-    PackStart,
-    PackResponse,
-    PackChunk,
-    PlayerLeft,
-    ProgressBar,
-    Restock,
-    FogColor,
-    WeaponReload,
-    ChangeTeam,
-    ChangeWeapon,
-    SetScore
-]
+cdef class UseCommand(Loader):
+    id: int = 37
+
+    cpdef read(self, ByteReader reader):
+        pass
+
+    cpdef write(self, ByteWriter reader):
+        reader.write_uint8(self.id)
+
+
+cdef class PlaceMG(Loader):
+    id: int = 38
+
+    cdef public:
+        Pos3f data
+        float yaw
+
+    def __cinit__(self):
+        self.data = Pos3f()
+
+    cpdef read(self, ByteReader reader):
+        self.data.read(reader)
+        self.yaw = reader.read_float()
+
+    cpdef write(self, ByteWriter writer):
+        writer.write_uint8(self.id)
+        self.data.write(writer)
+        writer.write_float(self.yaw)
+
+
+
+LOADERS = [obj for obj in Loader.__subclasses__() if obj.id >= 0]
 
 cdef set SERVER_ONLY_LOADERS = {SetHP}
 cdef set CLIENT_ONLY_LOADERS = {HitPacket}

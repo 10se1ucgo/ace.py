@@ -1,16 +1,16 @@
 from acelib import packets
 
 __all__ = [
-    "create_player", "position_data", "orientation_data", "input_data", "oriented_item", "set_tool", "set_color",
+    "create_player", "position_data", "client_update_data", "input_data", "oriented_item", "set_tool", "set_color",
     "fog_color", "existing_player", "player_left", "server_block_action", "block_action", "kill_action", "chat_message",
     "map_start", "map_chunk", "pack_start", "pack_chunk", "state_data", "create_entity", "change_entity",
-    "destroy_entity", "restock", "set_hp", "change_weapon", "change_team", "weapon_reload", "progress_bar",
+    "destroy_entity", "restock", "set_hp", "change_class", "change_team", "weapon_reload", "progress_bar",
     "world_update", "block_line", "weapon_input", "set_score", "play_sound", "stop_sound"
 ]
 
 create_player = packets.CreatePlayer()
 position_data = packets.PositionData()
-orientation_data = packets.OrientationData()
+client_update_data = packets.PositionOrientationData()
 input_data = packets.InputData()
 oriented_item = packets.UseOrientedItem()
 set_tool = packets.SetTool()
@@ -32,7 +32,7 @@ change_entity = packets.ChangeEntity()
 destroy_entity = packets.DestroyEntity()
 restock = packets.Restock()
 set_hp = packets.SetHP()
-change_weapon = packets.ChangeWeapon()
+change_class = packets.ChangeClass()
 change_team = packets.ChangeTeam()
 weapon_reload = packets.WeaponReload()
 progress_bar = packets.ProgressBar()

@@ -398,6 +398,7 @@ cdef class Entity(Loader):
         uint8_t id, type, state
         int8_t carrier
         Pos3f position
+        float yaw
 
     def __cinit__(self):
         self.position = Pos3f()
@@ -408,6 +409,7 @@ cdef class Entity(Loader):
         self.state = reader.read_uint8()
         self.carrier = reader.read_int8()
         self.position.read(reader)
+        self.yaw = reader.read_float()
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
@@ -415,6 +417,7 @@ cdef class Entity(Loader):
         writer.write_uint8(self.state)
         writer.write_int8(self.carrier)
         self.position.write(writer)
+        writer.write_float(self.yaw)
 
 
 cdef class ChangeEntity(Loader):
@@ -423,6 +426,7 @@ cdef class ChangeEntity(Loader):
     cdef public:
         # yes, this is basically Entity, except `type` is the action to perform on the entity, not the Entity type.
         # Also, certain fields are only written based on the change type.
+        # Also you can't set the yaw(?).
         uint8_t entity_id, type, state
         int8_t carrier
         Pos3f position
@@ -1052,24 +1056,24 @@ cdef class PlaceMG(Loader):
     id: int = 38
 
     cdef public:
-        Pos3f data
+        Pos3f pos
         float yaw
 
     def __cinit__(self):
-        self.data = Pos3f()
+        self.pos = Pos3f()
 
     cpdef read(self, ByteReader reader):
-        self.data.read(reader)
+        self.pos.read(reader)
         self.yaw = reader.read_float()
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
-        self.data.write(writer)
+        self.pos.write(writer)
         writer.write_float(self.yaw)
 
 
 
-LOADERS = [obj for obj in Loader.__subclasses__() if obj.id >= 0]
+LOADERS = Loader.__subclasses__()
 
 cdef set SERVER_ONLY_LOADERS = {SetHP}
 cdef set CLIENT_ONLY_LOADERS = {HitPacket}

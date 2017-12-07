@@ -5,7 +5,6 @@ class WEAPON(IntEnum):
     SEMI = 0
     SMG = 1
     SHOTGUN = 2
-    RPG = 3
 
 
 class HIT(IntEnum):
@@ -22,6 +21,8 @@ class TOOL(IntEnum):
     WEAPON = 2
     GRENADE = 3
     RPG = 4
+    MG = 5
+    SNIPER = 6
 
 
 class ACTION(IntEnum):
@@ -49,6 +50,7 @@ class ENTITY(IntEnum):
     HELICOPTER = 2
     AMMO_CRATE = 3
     HEALTH_CRATE = 4
+    MACHINE_GUN = 5
 
 
 class KILL(IntEnum):
@@ -59,6 +61,7 @@ class KILL(IntEnum):
     FALL = 4
     TEAM_CHANGE = 5
     CLASS_CHANGE = 6
+    ENTITY = 7
 
 
 class DISCONNECT(IntEnum):
@@ -73,6 +76,9 @@ class SET(IntEnum):
     STATE = 0
     POSITION = 1
     CARRIER = 2
+    # unused :<
+    # likely have to patch client ourselves
+    ORIENTATION = 3
 
 
 class DAMAGE(IntEnum):
@@ -100,5 +106,7 @@ MAX_DAMAGE = 2
 
 ROCKET_SPEED = 45.0
 ROCKET_FALLOFF = 25.0
+
+MG_SHOOT_RATE = 0.2
 
 PROTOCOL_VERSION = 3

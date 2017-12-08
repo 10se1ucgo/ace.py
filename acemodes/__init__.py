@@ -6,7 +6,10 @@ from aceserver import protocol, connection, types, util
 
 
 class GameMode:
-    name: str = "Default"
+    name: str = "Unknown!"
+    description: str = "Description!"
+
+    short_name: str = "default"
 
     @property
     def score_limit(self) -> int:

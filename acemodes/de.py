@@ -15,7 +15,15 @@ class C4(types.Flag):
 
 
 class Defusal(GameMode):
-    name = "Defusal"
+    name = "Bomb Defusal"
+    description = """Terrorists:
+    Plant the C4 explosive and run down its countdown without the Counter-Terrorists defusing it.
+    
+    Counter-Terrorists:
+    Defuse the C4 explosive or eliminate the Terrorists before they plant it.
+    """
+
+    short_name = "de"
     score_limit = 10
 
     async def init(self):

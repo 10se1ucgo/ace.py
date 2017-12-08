@@ -111,7 +111,17 @@ class Territory(types.CommandPost):
 
 
 class TC(GameMode):
-    name = "TC"
+    name = "Territory Control"
+
+    @property
+    def description(self):
+        return f"""Work together to capture territories; more players capture faster.
+Then, defend your own!
+        
+First team to capture all {self.score_limit} territories win.
+    """
+
+    short_name = "tc"
 
     @property
     def score_limit(self):

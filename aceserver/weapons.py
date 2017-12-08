@@ -255,7 +255,7 @@ class Shotgun(Weapon):
 
 
 class RPG(Weapon):
-    type = WEAPON.RPG
+    type = TOOL.RPG
     name = "RPG"
 
     max_primary = 1
@@ -271,6 +271,41 @@ class RPG(Weapon):
 
     def update(self, dt):
         pass
+
+
+class MG(Weapon):
+    type = TOOL.MG
+    name = "MG"
+
+    max_primary = 1
+    max_secondary = 0
+
+    primary_rate = 1.0
+
+    reload_time = 0.0
+    one_by_one = False
+
+    damage = {HIT.TORSO: None, HIT.HEAD: None, HIT.ARMS: None, HIT.LEGS: None}
+    falloff = 0
+
+    def update(self, dt):
+        pass
+
+
+class Sniper(Weapon):
+    type = TOOL.SNIPER
+    name = "Sniper"
+
+    max_primary = 5
+    max_secondary = 25
+
+    primary_rate = 1
+
+    reload_time = 2.5
+    one_by_one = False
+
+    damage = {HIT.TORSO: 50, HIT.HEAD: 150, HIT.ARMS: 35, HIT.LEGS: 35}
+    falloff = 0.03
 
 
 WEAPONS = {cls.type: cls for cls in Weapon.__subclasses__()}

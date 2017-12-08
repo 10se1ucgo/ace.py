@@ -88,8 +88,8 @@ cdef class VXLMap:
         return MAP_Z
 
     def to_grid(self, x: double, y: double):
-        letter = chr(ord('A') + x // 64)
-        number = str(y // 64 + 1)
+        letter = chr(ord('A') + <int>(x // 64))
+        number = str(<int>(y // 64) + 1)
         return letter + number
 
     def from_grid(self, grid: str):

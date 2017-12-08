@@ -204,7 +204,7 @@ class ServerProtocol(base.BaseProtocol):
         state_data.team2_name = self.team2.name
         state_data.team2_score = self.team2.score
 
-        state_data.mode_name = self.mode.name
+        state_data.mode_name = self.mode.short_name
         state_data.score_limit = self.mode.score_limit
 
         state_data.entities = [ent.to_loader() for ent in self.entities.values()]
@@ -230,7 +230,7 @@ class ServerProtocol(base.BaseProtocol):
         elif data == b'HELLOLAN':
             entry = {
                 "name": self.name, "players_current": len(self.players), "players_max": self.max_players,
-                "map": self.map.name, "game_mode": self.mode.name, "game_version": "1.0a1"
+                "map": self.map.name, "game_mode": self.mode.short_name, "game_version": "1.0a1"
             }
             payload = json.dumps(entry).encode()
             self.host.socket.send(address, payload)

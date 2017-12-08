@@ -5,7 +5,7 @@ __all__ = [
     "fog_color", "existing_player", "player_left", "server_block_action", "block_action", "kill_action", "chat_message",
     "map_start", "map_chunk", "pack_start", "pack_chunk", "state_data", "create_entity", "change_entity",
     "destroy_entity", "restock", "set_hp", "change_class", "change_team", "weapon_reload", "progress_bar",
-    "world_update", "block_line", "weapon_input", "set_score", "play_sound", "stop_sound"
+    "world_update", "block_line", "weapon_input", "set_score", "play_sound", "stop_sound", "initial_info"
 ]
 
 create_player = packets.CreatePlayer()
@@ -42,3 +42,4 @@ weapon_input = packets.WeaponInput()
 set_score = packets.SetScore()
 play_sound = packets.PlaySound()
 stop_sound = packets.StopSound()
+initial_info = packets.InitialInfo()

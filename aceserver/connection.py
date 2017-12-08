@@ -39,6 +39,9 @@ class ServerConnection(base.BaseConnection):
         self.block = weapons.Block(self)
         self.spade = weapons.Spade(self)
         self.grenade = weapons.Grenade(self)
+        self.rpg = weapons.RPG(self)
+        self.mg = weapons.MG(self)
+        self.sniper = weapons.Sniper(self)
         self.tool_type = TOOL.WEAPON
 
         self.wo: world.Player = None
@@ -116,11 +119,17 @@ class ServerConnection(base.BaseConnection):
         return asyncio.wait_for(fut, timeout, loop=self.protocol.loop)
 
     async def send_connection_data(self):
+        await self.send_info()
         await self.send_packs()
         await self.send_map()
         await self.send_state()
         await self.send_players()
         await self.on_player_connect(self)
+
+    async def send_info(self):
+        initial_info.mode_name = self.protocol.mode.name
+        initial_info.mode_description = self.protocol.mode.description
+        await self.send_loader(initial_info)
 
     async def send_packs(self):
         for data, length, crc32 in self.protocol.packs:
@@ -443,7 +452,7 @@ class ServerConnection(base.BaseConnection):
 
     @on_loader_receive(packets.WeaponReload)
     async def recv_weapon_reload(self, loader: packets.WeaponReload):
-        if self.dead or self.tool_type != TOOL.WEAPON: return
+        if self.dead: return
         reloading = self.tool.reload()
         if reloading:
             loader.player_id = self.id
@@ -453,7 +462,7 @@ class ServerConnection(base.BaseConnection):
     async def recv_set_tool(self, loader: packets.SetTool):
         if self.dead: return
 
-        self.wo.set_weapon(loader.value == TOOL.WEAPON)
+        self.wo.set_weapon(loader.value in (TOOL.WEAPON, TOOL.SNIPER))
         await self.set_tool(loader.value)
 
     @on_loader_receive(packets.SetColor)
@@ -485,9 +494,9 @@ class ServerConnection(base.BaseConnection):
             print(loader.velocity.xyz)
             velocity = validate(math3d.Vector3(*velocity), self.wo.orientation + self.wo.velocity).xyz
         elif loader.tool == TOOL.RPG:
-            if self.tool_type != TOOL.WEAPON or self.tool.type != WEAPON.RPG:
+            if self.tool_type != TOOL.RPG:
                 return
-            if self.weapon.on_primary():
+            if self.rpg.on_primary():
                 obj_type = types.Rocket
             velocity = validate(math3d.Vector3(*velocity), self.wo.orientation).xyz
             # note: loader.velocity is actually orientation for RPG rockets.
@@ -500,7 +509,7 @@ class ServerConnection(base.BaseConnection):
     async def recv_oriented_item(self, loader: packets.HitPacket):
         if self.dead:
             return
-        if self.tool_type != TOOL.WEAPON or not self.tool.primary:
+        if self.tool_type not in (TOOL.WEAPON, TOOL.SNIPER) or not self.tool.primary:
             return
 
         if not self.weapon.check_rapid():
@@ -560,7 +569,7 @@ class ServerConnection(base.BaseConnection):
 
     @property
     def tools(self) -> List[weapons.Tool]:
-        return [self.spade, self.block, self.weapon, self.grenade]
+        return [self.spade, self.block, self.weapon, self.grenade, self.rpg, self.mg, self.sniper]
 
     @property
     def position(self) -> math3d.Vector3:

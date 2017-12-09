@@ -127,10 +127,10 @@ class Entity:
                 if dist <= 3 ** 2:
                     self.protocol.loop.create_task(self.on_collide(self, conn))
 
-    async def set_team(self, team: Team=None):
+    async def set_team(self, team: Team=None, force=False):
         if self.destroyed:
             return
-        if team is self.team:
+        if not force and team is self.team:
             return
         self.team = team
         state = self.team.id if self.team else TEAM.NEUTRAL
@@ -148,10 +148,10 @@ class Entity:
         change_entity.position.xyz = self.position.xyz
         await self.protocol.broadcast_loader(change_entity)
 
-    async def set_carrier(self, carrier: 'connection.ServerConnection'=None):
+    async def set_carrier(self, carrier: 'connection.ServerConnection'=None, force=False):
         if self.destroyed:
             return
-        if carrier is self.carrier:
+        if not force and carrier is self.carrier:
             return
         self.carrier = carrier
         player = self.carrier.id if self.carrier else -1

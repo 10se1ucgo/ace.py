@@ -190,9 +190,27 @@ class ServerProtocol(base.BaseProtocol):
         print(f"player leave {conn.id}")
         ply = self.players.pop(conn.id, None)
         self.player_ids.push(conn.id)
+
+        for ent in self.entities.values():
+            if ent.carrier and ent.carrier.id == ply.id:
+                await ent.set_carrier(None, force=True)
+
         if ply:  # PlayerLeft will crash the clients if the left player didn't actually join the game.
             player_left.player_id = conn.id
             await self.broadcast_loader(player_left)
+
+
+
+    async def send_entity_carriers(self, conn: 'connection.ServerConnection'):
+        """
+        entities that already exist when a client connects (i.e. sent in StateData) have their
+        carrier field ignored by the client; and you can't really patch it in client because as far as the
+        client is aware no players exist by the time StateData is sent so it throws an error if you try to retrieve
+        the player to set the carrier
+        """
+        for ent in self.entities.values():
+            if ent.carrier is not None:
+                await ent.set_carrier(ent.carrier, force=True)
 
     def get_state(self):
         state_data.fog_color.rgb = self.fog_color
@@ -223,6 +241,7 @@ class ServerProtocol(base.BaseProtocol):
     def init_hooks(self):
         connection.ServerConnection.on_player_join += self.player_joined
         connection.ServerConnection.on_player_leave += self.player_left
+        connection.ServerConnection.on_player_connect += self.send_entity_carriers
 
     def intercept(self, address: enet.Address, data: bytes):
         # Respond to server list query from client

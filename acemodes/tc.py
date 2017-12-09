@@ -119,7 +119,7 @@ class TC(GameMode):
 Then, defend your own!
         
 First team to capture all {self.score_limit} territories win.
-    """
+"""
 
     short_name = "tc"
 

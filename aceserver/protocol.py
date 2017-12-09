@@ -46,9 +46,10 @@ class ServerProtocol(base.BaseProtocol):
         team2 = self.config.get("team2", {})
         self.team1 = types.Team(self, TEAM.TEAM1, team1.get("name", "Blue"), team1.get("color", (44, 117, 179)))
         self.team2 = types.Team(self, TEAM.TEAM2, team2.get("name", "Green"), team2.get("color", (137, 179, 44)))
+        self.spectator_team = types.Team(self, TEAM.SPECTATOR, "Spectator", (255, 255, 255), spectator=True)
         self.team1.other = self.team2
         self.team2.other = self.team1
-        self.teams = {self.team1.id: self.team1, self.team2.id: self.team2}
+        self.teams = {self.team1.id: self.team1, self.team2.id: self.team2, self.spectator_team.id: self.spectator_team}
 
         self.fog_color = self.config.get("fog_color", (128, 232, 255))
 

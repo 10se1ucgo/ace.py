@@ -19,6 +19,7 @@ cdef extern from "vxl_c.h" nogil:
         int get_z(int x, int y, int start) except +
         void get_random_point(int *x, int *y, int *z, int x1, int y1, int x2, int y2)
         vector[Pos3] get_neighbors(int x, int y, int z)
+        vector[Pos3] block_line(int x1, int y1, int z1, int x2, int y2, int z2)
 
         bool set_point(int x, int y, int z, bool solid, uint32_t color) except +
         void set_column_solid(int x, int y, int z_start, int z_end, bool solid) except +
@@ -42,12 +43,12 @@ cdef class VXLMap:
     cpdef bint can_build(self, int x, int y, int z)
 
     cpdef bint set_point(self, int x, int y, int z, bool solid, uint32_t color=?, bool destroy=?)
-    # cpdef uint32_t get_color(self, size_t x, size_t y, size_t z)
-    # cpdef bint get_solid(self, size_t x, size_t y, size_t z)
+    cpdef bint build_point(self, int x, int y, int z, tuple color)
+    cpdef bint destroy_point(self, int x, int y, int z)
+
+    cpdef list block_line(self, int x1, int y1, int z1, int x2, int y2, int z2)
     cpdef int get_z(self, int x, int y, int start=?)
     cpdef tuple get_random_pos(self, int x1, int y1, int x2, int y2)
-    # cpdef list get_neighbors(self, int x, int y, int z)
-
     cpdef bytes get_bytes(self)
 
 

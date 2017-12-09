@@ -10,11 +10,10 @@ class CTF(GameMode):
 
     @property
     def description(self):
-        return f"""Infiltrate the enemy base by whatever means, make off with
-    their intel and get back to your base. Watch out, the enemy has similar plans for your intel.
+        return f"""Infiltrate the enemy base by whatever means, make off with their intel and get back to your base. Watch out, the enemy has similar plans for your intel.
     
-    The first team to retrieve their enemies intel {self.score_limit} times wins.
-    """
+The first team to retrieve their enemies intel {self.score_limit} times wins.
+"""
 
     short_name = "ctf"
     score_limit = 10

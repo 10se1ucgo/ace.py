@@ -231,6 +231,8 @@ class Explosive:
         x, y, z = self.wo.position.xyz
         await self.thrower.destroy_block(int(x), int(y), int(z), ACTION.GRENADE)
         for player in self.protocol.players.values():
+            if player.dead: continue
+
             dist = player.position.sq_distance(self.wo.position)
             if dist < 16 ** 2 and self.hit_test(player):
                 if dist == 0:

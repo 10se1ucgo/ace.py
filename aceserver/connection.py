@@ -62,7 +62,7 @@ class ServerConnection(base.BaseConnection):
 
     async def on_disconnect(self):
         if self.id is not None:
-            await self.on_player_leave(self)
+            self.protocol.loop.create_task(self.on_player_leave(self))
 
     async def on_receive(self, packet: enet.Packet):
         try:
@@ -157,7 +157,10 @@ class ServerConnection(base.BaseConnection):
         map_start.size = map.estimated_size
         await self.send_loader(map_start)
 
-        for chunk in map.iter_compressed():
+        compressor = zlib.compressobj(9, memLevel=3)
+        for chunk in map.iter_compressed(compressor):
+            if len(chunk) <= 0:
+                continue
             map_chunk.data = chunk
             await self.send_loader(map_chunk)
 
@@ -185,6 +188,9 @@ class ServerConnection(base.BaseConnection):
         create_player.team = self.team.id
         await self.protocol.broadcast_loader(create_player)
 
+        if self.team == self.protocol.spectator_team:
+            return
+
         if self.wo is None:
             self.wo = world.Player(self.protocol.map)
 
@@ -205,12 +211,12 @@ class ServerConnection(base.BaseConnection):
         set_hp.source.xyz = source
         await self.send_loader(set_hp)
 
-    async def kill(self, kill_type: KILL=KILL.FALL, killer: 'ServerConnection'=None):
+    async def kill(self, kill_type: KILL=KILL.FALL, killer: 'ServerConnection'=None, respawn_time=None):
         if self.dead or self.store.get("respawn_task") is not None: return
 
         self.wo.set_dead(True)
 
-        respawn_time = self.protocol.get_respawn_time()
+        respawn_time = respawn_time or self.protocol.get_respawn_time()
 
         kill_action.player_id = self.id
         kill_action.killer_id = (killer or self).id
@@ -258,6 +264,24 @@ class ServerConnection(base.BaseConnection):
         set_tool.value = tool
         await self.protocol.broadcast_loader(set_tool)
 
+    async def set_weapon(self, weapon: WEAPON, respawn_time=None):
+        # TODO hooks
+        if self.weapon.type == weapon:
+            return
+        self.weapon = weapons.WEAPONS[weapon](self)
+        await self.kill(KILL.CLASS_CHANGE, respawn_time=respawn_time)
+
+    async def set_team(self, team: TEAM, respawn_time=None):
+        # TODO hooks
+        if self.team.id == team:
+            return
+        old_team = self.team
+        self.team = self.protocol.teams[team]
+        if old_team.spectator:
+            await self.spawn()
+        else:
+            await self.kill(KILL.TEAM_CHANGE, respawn_time=respawn_time)
+
     async def destroy_block(self, x: int, y: int, z: int, destroy_type: ACTION=ACTION.DESTROY):
         hook = await self.try_destroy_block(self, x, y, z, destroy_type)
         if hook is False:
@@ -282,8 +306,7 @@ class ServerConnection(base.BaseConnection):
             self.block.destroy()
 
         for ax, ay, az in to_destroy:
-            if self.protocol.map.can_build(ax, ay, az):
-                self.protocol.map.set_point(ax, ay, az, False)
+            self.protocol.map.destroy_point(ax, ay, az)
 
         block_action.player_id = self.id
         block_action.xyz = (x, y, z)
@@ -292,26 +315,17 @@ class ServerConnection(base.BaseConnection):
         self.protocol.loop.create_task(self.on_destroy_block(self, x, y, z, destroy_type))
         return True
 
-    async def build_block(self, x: int, y: int, z: int, color: Tuple[int, int, int]=None) -> bool:
-        if not self.protocol.map.can_build(x, y, z):
+    async def build_block(self, x: int, y: int, z: int) -> bool:
+        if not self.block.build() or not self.block.check_rapid():
             return False
-
-        if not self.block.build():
-            return False
-
-        if not self.block.check_rapid():
-            return False
-
-        if color is not None:
-            await self.block.set_color(*color)
 
         hook = await self.try_build_block(self, x, y, z)
         if hook is False:
             return False
         if hook is not None:
             x, y, z = hook
-        r, g, b = self.block.color.rgb
-        if self.protocol.map.set_point(x, y, z, True, (0x7F << 24) | r << 16 | g << 8 | b << 0):
+
+        if self.protocol.map.build_point(x, y, z, self.block.color.rgb):
             block_action.player_id = self.id
             block_action.xyz = (x, y, z)
             block_action.value = ACTION.BUILD
@@ -319,6 +333,34 @@ class ServerConnection(base.BaseConnection):
             self.protocol.loop.create_task(self.on_build_block(self, x, y, z))
             return True
         return False
+
+    async def build_line(self, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int) -> bool:
+        if not self.block.check_rapid(primary=False):
+            return False
+
+        points = self.protocol.map.block_line(x1, y1, z1, x2, y2, z2)
+        if not points:
+            return False
+
+        if not self.block.build(len(points)):
+            return False
+
+        for point in points:
+            x, y, z = point
+            self.protocol.map.build_point(x, y, z, self.block.color.rgb)
+
+        # TODO hooks
+        # hook = await self.try_build_block(self, x, y, z)
+        # if hook is False:
+        #     return False
+        # if hook is not None:
+        #     x, y, z = hook
+
+        block_line.player_id = self.id
+        block_line.xyz1 = x1, y1, z1
+        block_line.xyz2 = x2, y2, z2
+        await self.protocol.broadcast_loader(block_line)
+        return True
 
     async def set_position(self, x=None, y=None, z=None, reset=True):
         if x is None or y is None:
@@ -436,9 +478,16 @@ class ServerConnection(base.BaseConnection):
             return  # client shouldnt send this
 
         if loader.value == ACTION.BUILD:
+            if self.tool_type != TOOL.BLOCK:
+                return
             await self.build_block(loader.x, loader.y, loader.z)
         else:
             await self.destroy_block(loader.x, loader.y, loader.z, loader.value)
+
+    @on_loader_receive(packets.BlockLine)
+    async def recv_block_line(self, loader: packets.BlockLine):
+        if self.dead or self.tool_type != TOOL.BLOCK: return
+        await self.build_line(loader.x1, loader.y1, loader.z1, loader.x2, loader.y2, loader.z2)
 
     @on_loader_receive(packets.WeaponInput)
     async def recv_weapon_input(self, loader: packets.WeaponInput):
@@ -457,6 +506,14 @@ class ServerConnection(base.BaseConnection):
         if reloading:
             loader.player_id = self.id
             await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
+
+    @on_loader_receive(packets.ChangeClass)
+    async def recv_change_class(self, loader: packets.ChangeClass):
+        await self.set_weapon(loader.class_id)
+
+    @on_loader_receive(packets.ChangeTeam)
+    async def recv_change_team(self, loader: packets.ChangeTeam):
+        await self.set_team(loader.team)
 
     @on_loader_receive(packets.SetTool)
     async def recv_set_tool(self, loader: packets.SetTool):

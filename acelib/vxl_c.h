@@ -40,6 +40,7 @@ public:
     int get_z(const int x, const int y, const int start=0);
     void get_random_point(int *x, int *y, int *z, int x1, int y1, int x2, int y2);
     std::vector<Pos3> get_neighbors(int x, int y, int z);
+    std::vector<Pos3> block_line(int x1, int y1, int z1, int x2, int y2, int z2) const;
 
     bool set_point(const int x, const int y, const int z, const bool solid, const uint32_t color);
     bool set_point(const size_t pos, const bool solid, const uint32_t color);

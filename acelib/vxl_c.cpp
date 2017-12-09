@@ -213,6 +213,85 @@ std::vector<Pos3> AceMap::get_neighbors(int x, int y, int z) {
     return neighbors;
 }
 
+std::vector<Pos3> AceMap::block_line(int x1, int y1, int z1, int x2, int y2, int z2) const {
+    std::vector<Pos3> ret;
+
+    Pos3 c{ x1, y1, z1 };
+    Pos3 d{ x2 - x1, y2 - y1, z2 - z1 };
+    long ixi, iyi, izi, dx, dy, dz, dxi, dyi, dzi;
+    const size_t VSID = MAP_X;
+
+    if (d.x < 0) ixi = -1;
+    else ixi = 1;
+    if (d.y < 0) iyi = -1;
+    else iyi = 1;
+    if (d.z < 0) izi = -1;
+    else izi = 1;
+
+    if ((abs(d.x) >= abs(d.y)) && (abs(d.x) >= abs(d.z)))
+    {
+        dxi = 1024; dx = 512;
+        dyi = static_cast<long>(!d.y ? 0x3fffffff / VSID : abs(d.x * 1024 / d.y));
+        dy = dyi / 2;
+        dzi = static_cast<long>(!d.z ? 0x3fffffff / VSID : abs(d.x * 1024 / d.z));
+        dz = dzi / 2;
+    }
+    else if (abs(d.y) >= abs(d.z))
+    {
+        dyi = 1024; dy = 512;
+        dxi = static_cast<long>(!d.x ? 0x3fffffff / VSID : abs(d.y * 1024 / d.x));
+        dx = dxi / 2;
+        dzi = static_cast<long>(!d.z ? 0x3fffffff / VSID : abs(d.y * 1024 / d.z));
+        dz = dzi / 2;
+    }
+    else
+    {
+        dzi = 1024; dz = 512;
+        dxi = static_cast<long>(!d.x ? 0x3fffffff / VSID : abs(d.z * 1024 / d.x));
+        dx = dxi / 2;
+        dyi = static_cast<long>(!d.y ? 0x3fffffff / VSID : abs(d.z * 1024 / d.y));
+        dy = dyi / 2;
+    }
+    if (ixi >= 0) dx = dxi - dx;
+    if (iyi >= 0) dy = dyi - dy;
+    if (izi >= 0) dz = dzi - dz;
+
+    while (true) {
+        ret.push_back(c);
+
+        if (c.x == x2 &&
+            c.y == y2 &&
+            c.z == z2)
+            break;
+
+        if ((dz <= dx) && (dz <= dy))
+        {
+            c.z += izi;
+            if (c.z < 0 || c.z >= MAP_Z)
+                break;
+            dz += dzi;
+        }
+        else
+        {
+            if (dx < dy)
+            {
+                c.x += ixi;
+                if (static_cast<unsigned long>(c.x) >= VSID)
+                    break;
+                dx += dxi;
+            }
+            else
+            {
+                c.y += iyi;
+                if (static_cast<unsigned long>(c.y) >= VSID)
+                    break;
+                dy += dyi;
+            }
+        }
+    }
+    return ret;
+}
+
 bool AceMap::set_point(const int x, const int y, const int z, const bool solid, const uint32_t color) {
     return this->set_point(get_pos(x, y, z), solid, color);
 }

@@ -95,14 +95,14 @@ class Block(Tool):
         self.color = packets.Color()
         self.color.rgb = (112, 112, 112)
 
-    def build(self):
-        if self.primary_ammo > 0:
-            self.primary_ammo -= 1
-            return True
-        return False
+    def build(self, num=1):
+        if self.primary_ammo < num:
+            return False
+        self.primary_ammo -= num
+        return True
 
-    def destroy(self):
-        self.primary_ammo = max(0, min(self.primary_ammo + 1, self.max_primary))
+    def destroy(self, num=1):
+        self.primary_ammo = max(0, min(self.primary_ammo + num, self.max_primary))
 
     def reset(self):
         super().reset()
@@ -251,7 +251,7 @@ class Shotgun(Weapon):
     one_by_one = True
 
     damage = {HIT.TORSO: 25, HIT.HEAD: 30, HIT.ARMS: 20, HIT.LEGS: 20}
-    falloff = 0.40
+    falloff = 0.20
 
 
 class RPG(Weapon):

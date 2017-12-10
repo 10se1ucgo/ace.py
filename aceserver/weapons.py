@@ -273,6 +273,7 @@ class RPG(Weapon):
         pass
 
 
+# TODO not really a weapon
 class MG(Weapon):
     type = TOOL.MG
     name = "MG"

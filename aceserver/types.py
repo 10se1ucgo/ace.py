@@ -95,12 +95,13 @@ class Entity:
     mountable = False
     on_collide = util.AsyncEvent()
 
-    def __init__(self, entity_id: int, protocol: 'protocol.ServerProtocol', position=(0, 0, 0), team=None, carrier=None):
+    def __init__(self, entity_id: int, protocol: 'protocol.ServerProtocol', position=(0, 0, 0), team=None, carrier=None,
+                 yaw: float=0.0):
         self.id = entity_id
         self.protocol = protocol
 
         self.position = math3d.Vector3(*position)
-        self.yaw = 0
+        self.yaw = yaw
         self.team: Team = team
         self.carrier: connection.ServerConnection = carrier
 
@@ -210,7 +211,44 @@ class HealthCrate(Entity):
     on_collide = util.AsyncEvent()
 
 
-ENTITIES = {cls.type: cls for cls in Entity.__subclasses__()}
+class MountableEntity(Entity):
+    mountable = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        connection.ServerConnection.on_use_command += self.try_mount
+        connection.ServerConnection.on_walk_change += self.player_input
+        connection.ServerConnection.on_animation_change += self.player_input
+
+    async def try_mount(self, connection: 'connection.ServerConnection'):
+        if self.carrier is not None:
+            if connection is self.carrier:
+                await self.mount(None)
+            else:
+                return
+        elif connection.position.sq_distance(self.position) <= 3 ** 2:
+            await self.mount(connection)
+
+    async def mount(self, connection):
+        if connection is None:
+            self.carrier.mounted_entity = None
+        else:
+            connection.mounted_entity = self
+        await self.set_carrier(connection)
+
+    async def player_input(self, connection, *args):
+        if connection is not self.carrier:
+            return
+
+        if any(args):
+            return await self.mount(None)
+
+
+class MachineGun(MountableEntity):
+    type = ENTITY.MACHINE_GUN
+
+
+ENTITIES = {cls.type: cls for cls in Entity.__subclasses__() if cls.type in ENTITY}
 
 
 class Explosive:

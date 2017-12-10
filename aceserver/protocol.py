@@ -199,8 +199,6 @@ class ServerProtocol(base.BaseProtocol):
             player_left.player_id = conn.id
             await self.broadcast_loader(player_left)
 
-
-
     async def send_entity_carriers(self, conn: 'connection.ServerConnection'):
         """
         entities that already exist when a client connects (i.e. sent in StateData) have their

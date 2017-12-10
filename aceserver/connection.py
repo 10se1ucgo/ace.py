@@ -34,6 +34,7 @@ class ServerConnection(base.BaseConnection):
         self.hp = 100
         self.team: types.Team = None
         self._score = 0
+        self.wo: world.Player = None
 
         self.weapon = weapons.Weapon(self)
         self.block = weapons.Block(self)
@@ -44,7 +45,7 @@ class ServerConnection(base.BaseConnection):
         self.sniper = weapons.Sniper(self)
         self.tool_type = TOOL.WEAPON
 
-        self.wo: world.Player = None
+        self.mounted_entity: types.MountableEntity = None
         self.store = {}
 
         self._listeners: Dict[int, List[asyncio.Future]] = defaultdict(list)
@@ -421,8 +422,14 @@ class ServerConnection(base.BaseConnection):
     async def recv_input_data(self, loader: packets.InputData):
         if self.dead: return
 
-        self.wo.set_walk(loader.up, loader.down, loader.left, loader.right)
-        self.wo.set_animation(loader.jump, loader.crouch, loader.sneak, loader.sprint)
+        walk = loader.up, loader.down, loader.left, loader.right
+        animation = loader.jump, loader.crouch, loader.sneak, loader.sprint
+
+        self.wo.set_walk(*walk)
+        self.protocol.loop.create_task(self.on_walk_change(self, *walk))
+        self.wo.set_animation(*animation)
+        self.protocol.loop.create_task(self.on_animation_change(self, *animation))
+
         loader.player_id = self.id
         await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
@@ -563,7 +570,7 @@ class ServerConnection(base.BaseConnection):
             await obj.broadcast_item(lambda conn: conn is not self)
 
     @on_loader_receive(packets.HitPacket)
-    async def recv_oriented_item(self, loader: packets.HitPacket):
+    async def recv_hit_packet(self, loader: packets.HitPacket):
         if self.dead:
             return
         if self.tool_type not in (TOOL.WEAPON, TOOL.SNIPER) or not self.tool.primary:
@@ -589,6 +596,18 @@ class ServerConnection(base.BaseConnection):
             return
 
         await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
+
+    @on_loader_receive(packets.PlaceMG)
+    async def recv_place_mg(self, loader: packets.PlaceMG):
+        x, y, z = loader.xyz
+        yaw = loader.yaw
+        if util.bad_float(yaw):
+            return await self.disconnect()
+        await self.protocol.create_entity(types.MachineGun, position=(x, y, z), yaw=yaw, team=self.team)
+
+    @on_loader_receive(packets.UseCommand)
+    async def recv_use_command(self, loader: packets.UseCommand):
+        self.protocol.loop.create_task(self.on_use_command(self))
 
     def update(self, dt):
         if self.dead: return
@@ -691,6 +710,17 @@ class ServerConnection(base.BaseConnection):
     try_chat_message = util.AsyncEvent(overridable=True)
     # (self, chat_message, chat_type) -> None
     on_chat_message = util.AsyncEvent()
+
+    # TODO allow direct packet hooks or just proxy them within the handlers?
+    # (self, forward, backward, left, right) -> None
+    on_walk_change = util.AsyncEvent()
+    # (self, jump, crouch, sneak, sprint) -> None
+    on_animation_change = util.AsyncEvent()
+    # (self, position, orientation) -> None
+    on_client_update = util.AsyncEvent()
+
+    # (self) -> None
+    on_use_command = util.AsyncEvent()
 
     def __str__(self):
         return self.name

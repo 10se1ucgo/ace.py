@@ -1056,21 +1056,29 @@ cdef class PlaceMG(Loader):
     id: int = 38
 
     cdef public:
-        Pos3f pos
+        uint32_t x, y, z
         float yaw
 
-    def __cinit__(self):
-        self.pos = Pos3f()
-
     cpdef read(self, ByteReader reader):
-        self.pos.read(reader)
+        self.x = reader.read_uint32()
+        self.y = reader.read_uint32()
+        self.z = reader.read_uint32()
         self.yaw = reader.read_float()
 
     cpdef write(self, ByteWriter writer):
         writer.write_uint8(self.id)
-        self.pos.write(writer)
+        writer.write_uint32(self.x)
+        writer.write_uint32(self.y)
+        writer.write_uint32(self.z)
         writer.write_float(self.yaw)
 
+    @property
+    def xyz(self):
+        return self.x, self.y, self.z
+
+    @xyz.setter
+    def xyz(self, value):
+        self.x, self.y, self.z = value
 
 
 LOADERS = Loader.__subclasses__()

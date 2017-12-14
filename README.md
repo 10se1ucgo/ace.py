@@ -4,8 +4,66 @@ its a LEARNING EXPERIENCE so pls dont flame
 
 feedback and help very welcome!!!
 
-you probably need a C++11 compiler for this
+# RUNNING
 
+1. build
+2. edit config.json
+3. run run.py
+
+# BUILDING
+
+You'll need
+ * Python 3.6+
+ * pyenet
+ * Cython
+ * A working C++(11?) compiler.
+    * If you're on Windows you'll want to use MSVC 2015 or 2017
+    (should be the same MSVC version your Python installation was built with)
+
+See `build.bat` for an example on building.
+
+OPTIONAL:
+ * uvloop
+
+# STUFF AND THINGS (eventually will be a TODO)
+ * Protocol:
+    * [x] Script loading/unloading
+      * [x] Scripted gamemodes.
+      * [x] Built-in command script with argument parser etc.
+      * [ ] Complete set of hooks and utility functions
+      * [ ] Default set of general server scripts
+    * [x] Map loading and iterative sending
+      * [ ] Map switching/rotations
+      * [ ] Map metadata
+      * [ ] Proper configuration
+    * [x] Server packs (models, sounds, etc.)
+    * [x] Dynamic entities
+    * [x] Sounds played by server
+    * [x] System chat messages (big hud messages too)
+ * Connection:
+    * All these packets sent by the client are currently handled by the server:
+      * PositionOrientationData (update data for rubberbanding and orientation)
+      * InputData (movement directions + jump crouch sneak sprint)
+      * ExistingPlayer (player join + set name/team/weapon)
+        * spectator included \[untested\]
+      * ChatMessage (chat messages, team/global :P)
+      * BlockAction (building, destroying blocks)
+      * BlockLine
+      * WeaponInput/Reload (primary/secondary fire, reload)
+      * ChangeClass/Team (weapon/team)
+      * SetTool/Color (current selected tool/block color)
+      * UseOrientedItem (grenade thrown or rpg fired)
+      * HitPacket (weapon fire hits)
+      * PlaceMG (places a mounted machine gun at target location)
+      * UseCommand (generic use button keypress)
+    * [x] Basic rapid hack prevention
+ * Gameplay
+    * [x] Rifle, SMG, Shotgun, RPG, Sniper and basic MG support
+    * [x] Grenades and Rockets.
+    * [x] Building and destroying
+    * [x] Spawning, dying, respawning
+ * [x] probably some other things
+ * [ ] probably another set of other things
 
 # License
 I hope I did this right.

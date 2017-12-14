@@ -302,7 +302,10 @@ class ServerConnection(base.BaseConnection):
                     for az in range(z - 1, z + 2):
                         to_destroy.append((ax, ay, az))
         elif destroy_type == ACTION.DESTROY:
-            if not self.tool.check_rapid(primary=True, times=2):
+            if self.mounted_entity:
+                if not isinstance(self.mounted_entity, types.MachineGun) or not self.mounted_entity.check_rapid():
+                    return
+            elif not self.tool.check_rapid(primary=True, times=2):
                 return False
             self.block.destroy()
 
@@ -425,6 +428,7 @@ class ServerConnection(base.BaseConnection):
         walk = loader.up, loader.down, loader.left, loader.right
         animation = loader.jump, loader.crouch, loader.sneak, loader.sprint
 
+        # TODO: Maybe MountedEntities should be given direct control of walk/animation changes.
         self.wo.set_walk(*walk)
         self.protocol.loop.create_task(self.on_walk_change(self, *walk))
         self.wo.set_animation(*animation)
@@ -571,31 +575,57 @@ class ServerConnection(base.BaseConnection):
 
     @on_loader_receive(packets.HitPacket)
     async def recv_hit_packet(self, loader: packets.HitPacket):
+        # TODO this is a bit of a mess
         if self.dead:
             return
-        if self.tool_type not in (TOOL.WEAPON, TOOL.SNIPER) or not self.tool.primary:
-            return
 
-        if not self.weapon.check_rapid():
-            return
+        if loader.value != HIT.MELEE:
+            if self.mounted_entity:
+                if not isinstance(self.mounted_entity, types.MachineGun) or not self.mounted_entity.check_rapid():
+                    return
+                eye = math3d.Vector3(*self.mounted_entity.position.xyz)
+                eye.z -= 1.5
+                print(self.mounted_entity.position.xyz)
+                print(self.orientation)
+            elif self.tool_type in (TOOL.WEAPON, TOOL.SNIPER) and self.tool.primary:
+                if self.tool.type != WEAPON.SHOTGUN and not self.tool.check_rapid():
+                    return
+                eye = self.eye
+            else:
+                return
+        else:
+            if self.tool_type != TOOL.SPADE or not self.tool.check_rapid():
+                return
 
         # TODO our own raycasting and hack detection etc.
         other = self.protocol.players.get(loader.player_id)
         if other is None:
             return
 
-        vec = (other.eye - self.eye).normalized
-        if self.orientation.dot(vec) <= 0.9:
-            print(f"incorrect orientation to hit for {self!r}")
-            print(f"self.pos={self.position} other.pos={other.position}")
-            print(f"self.orien={self.orientation} expected={vec}")
-            return
+        if loader.value != HIT.MELEE:
+            vec = (other.eye - eye).normalized
+            if self.orientation.dot(vec) <= 0.9:
+                print(f"incorrect orientation to hit for {self!r}")
+                print(f"self.pos={self.position} other.pos={other.position}")
+                print(f"self.orien={self.orientation} expected={vec}")
+                return
 
-        damage = self.weapon.get_damage(loader.value, other.position.distance(self.position))
+            if self.mounted_entity:
+                damage = self.mounted_entity.get_damage(loader.value, other.position.distance(self.position))
+                cause = KILL.ENTITY
+            else:
+                damage = self.tool.get_damage(loader.value, other.position.distance(self.position))
+                cause = KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON
+        else:
+            if other.position.distance(self.position) > MELEE_DISTANCE:
+                return
+            damage = 50
+            cause = KILL.MELEE
+
         if damage is None:
             return
-
-        await other.hurt(damage=damage, cause=KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON, damager=self)
+        print("?")
+        await other.hurt(damage=damage, cause=cause, damager=self)
 
     @on_loader_receive(packets.PlaceMG)
     async def recv_place_mg(self, loader: packets.PlaceMG):

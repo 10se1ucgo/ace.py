@@ -7,6 +7,7 @@ import sys
 import shlex
 import inspect
 import traceback
+import ipaddress
 from typing import Dict, Callable
 
 from acelib.constants import CHAT, ENTITY, WEAPON
@@ -95,7 +96,6 @@ class CommandsScript(Script):
         ServerConnection.try_chat_message += self.try_chat_message
         ServerConnection.on_player_connect += self.on_player_connect
         self.protocol.scripts.on_scripts_loaded += self.on_scripts_loaded
-        self.add_commands(self)  # ha
 
     def add_commands(self, klass):
         for name, command in inspect.getmembers(klass, lambda member: isinstance(member, Command)):
@@ -138,7 +138,7 @@ class CommandsScript(Script):
         return False
 
     async def on_player_connect(self, connection: ServerConnection):
-        if connection.peer.address.host == "127.0.0.1":
+        if ipaddress.ip_address(connection.peer.address.host).is_private:
             connection.store["commands_admin"] = True
 
     @command()

@@ -217,8 +217,8 @@ class MountableEntity(Entity):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         connection.ServerConnection.on_use_command += self.try_mount
-        connection.ServerConnection.on_walk_change += self.player_input
-        connection.ServerConnection.on_animation_change += self.player_input
+        connection.ServerConnection.on_walk_change += self.player_walk
+        connection.ServerConnection.on_animation_change += self.player_animation
 
     async def try_mount(self, connection: 'connection.ServerConnection'):
         if self.carrier is not None:
@@ -236,16 +236,39 @@ class MountableEntity(Entity):
             connection.mounted_entity = self
         await self.set_carrier(connection)
 
-    async def player_input(self, connection, *args):
-        if connection is not self.carrier:
-            return
+    async def player_walk(self, connection, forward: bool, backward: bool, left: bool, right: bool):
+        pass
 
-        if any(args):
-            return await self.mount(None)
+    async def player_animation(self, connection, jump: bool, crouch: bool, sneak: bool, sprint: bool):
+        pass
 
 
 class MachineGun(MountableEntity):
     type = ENTITY.MACHINE_GUN
+
+    MG_SHOOT_RATE = 0.2
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.last_fire = 0
+
+    async def player_walk(self, connection, *args):
+        if connection is self.carrier and any(args):
+            await self.mount(None)
+
+    async def player_animation(self, connection, *args):
+        if connection is self.carrier and any(args):
+            await self.mount(None)
+
+    def check_rapid(self):
+        # if self.protocol.time - self.last_fire < (self.MG_SHOOT_RATE - 0.025):
+        #     return False
+        # self.last_fire = self.protocol.time
+        return True
+
+    def get_damage(self, value, dist):
+        return 10
+
 
 
 ENTITIES = {cls.type: cls for cls in Entity.__subclasses__() if cls.type in ENTITY}

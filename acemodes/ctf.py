@@ -73,9 +73,9 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
             await player.restock()
             player.store["ctf_last_restock"] = self.protocol.time
 
-        intel = self.intels[player.team.other]
-        if intel.carrier == player:
-            await self.capture_intel(player, intel)
+        for intel in self.intels:
+            if intel.carrier == player:
+                await self.capture_intel(player, intel)
 
     async def capture_intel(self, player: ServerConnection, intel: types.Flag):
         await self.reset_intel(intel)
@@ -95,9 +95,9 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
 
     async def on_player_kill(self, player: ServerConnection, kill_type: KILL, killer: ServerConnection):
         await super().on_player_kill(player, kill_type, killer)
-        intel = self.intels[player.team.other]
-        if intel.carrier == player:
-            await self.drop_intel(player, intel)
+        for intel in self.intels:
+            if intel.carrier == player:
+                await self.drop_intel(player, intel)
 
 
 def init(protocol: ServerProtocol):

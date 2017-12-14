@@ -251,7 +251,7 @@ class Shotgun(Weapon):
     one_by_one = True
 
     damage = {HIT.TORSO: 25, HIT.HEAD: 30, HIT.ARMS: 20, HIT.LEGS: 20}
-    falloff = 0.20
+    falloff = 0.40
 
 
 class RPG(Weapon):

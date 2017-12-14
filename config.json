@@ -18,7 +18,7 @@
   },
   "fog_color": [128, 232, 255],
 
-  "mode": "tc",
+  "mode": "ctf",
   "modes.default": {
     "respawn_time": 10,
     "score_limit": 10

@@ -60,7 +60,7 @@ class ServerProtocol(base.BaseProtocol):
 
         self.mode: acemodes.GameMode = acemodes.get_game_mode(self, self.config.get("mode", "ctf"))
         self.scripts = acescripts.ScriptLoader(self)
-        self.max_respawn_time = 5
+        self.max_respawn_time = self.config.get("respawn_time", 5)
 
     async def run(self):
         self.init_hooks()

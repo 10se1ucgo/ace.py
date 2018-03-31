@@ -114,7 +114,7 @@ class Block(Tool):
         loaders.set_color.player_id = self.connection.id
         loaders.set_color.color.rgb = r, g, b
         predicate = lambda conn: conn != self.connection if sender_is_self else None
-        await self.connection.protocol.broadcast_loader(loaders.set_color, predicate)
+        self.connection.protocol.broadcast_loader(loaders.set_color, predicate)
 
 
 class Weapon(Tool):
@@ -203,7 +203,7 @@ class Weapon(Tool):
         loaders.weapon_reload.player_id = self.connection.id
         loaders.weapon_reload.clip_ammo = self.primary_ammo
         loaders.weapon_reload.reserve_ammo = self.secondary_ammo
-        await self.connection.send_loader(loaders.weapon_reload)
+        self.connection.send_loader(loaders.weapon_reload)
 
 
 class Semi(Weapon):
@@ -229,7 +229,7 @@ class SMG(Weapon):
     max_primary = 30
     max_secondary = 120
 
-    primary_rate = 0.11
+    primary_rate = 0.1
 
     reload_time = 2.5
     one_by_one = False

@@ -50,22 +50,22 @@ class ServerConnection(base.BaseConnection):
 
         self._listeners: Dict[int, List[asyncio.Future]] = defaultdict(list)
 
-    async def on_connect(self, data: int):
+    def on_connect(self, data: int):
         if data != PROTOCOL_VERSION:
-            return await self.disconnect(DISCONNECT.WRONG_VERSION)
+            return self.disconnect(DISCONNECT.WRONG_VERSION)
 
         try:
             self.id = self.protocol.player_ids.pop()
         except KeyError:
-            return await self.disconnect(DISCONNECT.FULL)
+            return self.disconnect(DISCONNECT.FULL)
 
         self.protocol.loop.create_task(self.send_connection_data())
 
-    async def on_disconnect(self):
+    def on_disconnect(self):
         if self.id is not None:
             self.protocol.loop.create_task(self.on_player_leave(self))
 
-    async def on_receive(self, packet: enet.Packet):
+    def on_receive(self, packet: enet.Packet):
         try:
             reader: ByteReader = ByteReader(packet.data, packet.dataLength)
             packet_id: int = reader.read_uint8()
@@ -73,8 +73,8 @@ class ServerConnection(base.BaseConnection):
         except:
             print(f"Malformed packet from player #{self.id}, disconnecting.", file=sys.stderr)
             traceback.print_exc()
-            return await self.disconnect()
-        await self.received_loader(loader)
+            return self.disconnect()
+        self.protocol.loop.create_task(self.received_loader(loader))
 
     def _send_loader(self, writer: ByteWriter, flags=enet.PACKET_FLAG_RELIABLE):
         packet: enet.Packet = enet.Packet(bytes(writer), flags)
@@ -84,9 +84,9 @@ class ServerConnection(base.BaseConnection):
         # does this even DO anything?? enet just queues the packet for the next host_service call...
         # perhaps sending doesnt need to be coros, but receiving should.
         # please send help i have no clue what im doing
-        return self.protocol.loop.run_in_executor(None, self._send_loader, loader.generate(), flags)
+        return self._send_loader(loader.generate(), flags)
 
-    async def disconnect(self, reason: DISCONNECT=DISCONNECT.UNDEFINED):
+    def disconnect(self, reason: DISCONNECT=DISCONNECT.UNDEFINED):
         self.peer.disconnect(reason)
 
     def reset(self):
@@ -95,10 +95,10 @@ class ServerConnection(base.BaseConnection):
         if respawn_task is not None:
             respawn_task.cancel()
 
-    async def received_loader(self, loader: packets.Loader):
+    def received_loader(self, loader: packets.Loader):
         if self.id is None:
             print(loader)
-            return await self.disconnect()
+            return self.disconnect()
 
         listeners = self._listeners.pop(loader.id, ())
         for fut in listeners:
@@ -112,7 +112,7 @@ class ServerConnection(base.BaseConnection):
                 print(f"Warning: unhandled packet {loader.id}:{loader} from player #{self.id}")
         else:
             # print(f"Received {loader.id}:{loader} from player #{self.player_id}")
-            await handler(self, loader)
+            handler(self, loader)
 
     def wait_for(self, loader: Type[packets.Loader], timeout=None) -> Coroutine[Any, Any, packets.Loader]:
         fut = self.protocol.loop.create_future()
@@ -120,23 +120,23 @@ class ServerConnection(base.BaseConnection):
         return asyncio.wait_for(fut, timeout, loop=self.protocol.loop)
 
     async def send_connection_data(self):
-        await self.send_info()
+        self.send_info()
         await self.send_packs()
         await self.send_map()
-        await self.send_state()
-        await self.send_players()
+        self.send_state()
+        self.send_players()
         await self.on_player_connect(self)
 
-    async def send_info(self):
+    def send_info(self):
         initial_info.mode_name = self.protocol.mode.name
         initial_info.mode_description = self.protocol.mode.description
-        await self.send_loader(initial_info)
+        self.send_loader(initial_info)
 
     async def send_packs(self):
         for data, length, crc32 in self.protocol.packs:
             pack_start.checksum = crc32
             pack_start.size = length
-            await self.send_loader(pack_start)
+            self.send_loader(pack_start)
 
             try:
                 has_pack: bool = (await self.wait_for(packets.PackResponse, 3)).value
@@ -151,33 +151,35 @@ class ServerConnection(base.BaseConnection):
                     if not data:
                         break
                     pack_chunk.data = data
-                    await self.send_loader(pack_chunk)
+                    self.send_loader(pack_chunk)
+                    await asyncio.sleep(0)
 
     async def send_map(self):
         map = self.protocol.map
         map_start.size = map.estimated_size
-        await self.send_loader(map_start)
+        self.send_loader(map_start)
 
-        compressor = zlib.compressobj(9, memLevel=3)
+        compressor = zlib.compressobj(9)
         for chunk in map.iter_compressed(compressor):
             if len(chunk) <= 0:
                 continue
             map_chunk.data = chunk
-            await self.send_loader(map_chunk)
+            self.send_loader(map_chunk)
+            await asyncio.sleep(0)
 
-    async def send_state(self):
+    def send_state(self):
         data = self.protocol.get_state()
         data.player_id = self.id
-        await self.send_loader(data)
+        self.send_loader(data)
 
-    async def send_players(self):
+    def send_players(self):
         for conn in self.protocol.players.values():
-            await self.send_loader(conn.to_existing_player())
+            self.send_loader(conn.to_existing_player())
 
-    async def spawn(self, x: float=None, y: float=None, z: float=None):
+    def spawn(self, x: float=None, y: float=None, z: float=None):
         pos = self.protocol.mode.get_spawn_point(self) if x is None or y is None or z is None else (x, y, z)
 
-        hook = await self.try_player_spawn(self, x, y, z)
+        hook = self.try_player_spawn(self, x, y, z)
         if hook is False:
             return
         pos = pos if hook is None else hook
@@ -187,7 +189,7 @@ class ServerConnection(base.BaseConnection):
         create_player.player_id = self.id
         create_player.name = self.name
         create_player.team = self.team.id
-        await self.protocol.broadcast_loader(create_player)
+        self.protocol.broadcast_loader(create_player)
 
         if self.team == self.protocol.spectator_team:
             return
@@ -197,10 +199,10 @@ class ServerConnection(base.BaseConnection):
 
         self.wo.set_dead(False)
         self.wo.set_position(*pos, reset=True)
-        await self.restock()
+        self.restock()
         self.protocol.loop.create_task(self.on_player_spawn(self, x, y, z))
 
-    async def set_hp(self, hp: int, reason: DAMAGE=None, source: tuple=(0, 0, 0)):
+    def set_hp(self, hp: int, reason: DAMAGE=None, source: tuple=(0, 0, 0)):
         if reason is None:
             if hp >= self.hp:
                 reason = DAMAGE.HEAL
@@ -210,30 +212,33 @@ class ServerConnection(base.BaseConnection):
         set_hp.hp = self.hp
         set_hp.type = reason
         set_hp.source.xyz = source
-        await self.send_loader(set_hp)
+        self.send_loader(set_hp)
 
     async def kill(self, kill_type: KILL=KILL.FALL, killer: 'ServerConnection'=None, respawn_time=None):
         if self.dead or self.store.get("respawn_task") is not None: return
 
-        self.wo.set_dead(True)
-
         respawn_time = respawn_time or self.protocol.get_respawn_time()
+        hook = await self.try_player_kill(self, kill_type, killer, respawn_time)
+        if hook is False:
+            return
+        respawn_time = hook or respawn_time
 
+        self.wo.set_dead(True)
         kill_action.player_id = self.id
         kill_action.killer_id = (killer or self).id
         kill_action.kill_type = kill_type
         kill_action.respawn_time = respawn_time + 1
-        await self.protocol.broadcast_loader(kill_action)
+        self.protocol.broadcast_loader(kill_action)
 
         self.store["respawn_task"] = self.protocol.loop.create_task(self.respawn(respawn_time))
-        self.protocol.loop.create_task(self.on_player_kill(self, kill_type, killer))
+        self.protocol.loop.create_task(self.on_player_kill(self, kill_type, killer, respawn_time))
 
     async def respawn(self, respawn_time=0):
         await asyncio.sleep(respawn_time)
-        await self.spawn()
+        self.spawn()
         self.store.pop("respawn_task")
 
-    async def hurt(self, damage: int, cause: KILL=KILL.FALL, damager=None, source=(0, 0, 0)):
+    def hurt(self, damage: int, cause: KILL=KILL.FALL, damager=None, source=(0, 0, 0)):
         reason = DAMAGE.OTHER
         if not source:
             if damager is not None:
@@ -243,17 +248,18 @@ class ServerConnection(base.BaseConnection):
                 reason = DAMAGE.SELF
         damager = damager or self
 
-        hook = await self.try_player_hurt(self, damage, damager, cause)
+        hook = self.try_player_hurt(self, damage, damager, cause)
         if hook is False:
             return
         damage = damage if hook is None else hook
-        await self.set_hp(self.hp - damage, reason, source)
+        self.set_hp(self.hp - damage, reason, source)
         if self.hp <= 0:
-            await self.kill(cause, damager)
+            self.protocol.loop.create_task(self.kill(cause, damager))
         else:
             self.protocol.loop.create_task(self.on_player_hurt(self, damage, damager, reason))
 
-    async def set_tool(self, tool: TOOL):
+    def set_tool(self, tool: TOOL):
+        # TODO hooks
         if tool == self.tool_type:
             return
 
@@ -263,28 +269,28 @@ class ServerConnection(base.BaseConnection):
 
         set_tool.player_id = self.id
         set_tool.value = tool
-        await self.protocol.broadcast_loader(set_tool)
+        self.protocol.broadcast_loader(set_tool)
 
-    async def set_weapon(self, weapon: WEAPON, respawn_time=None):
+    def set_weapon(self, weapon: WEAPON, respawn_time=None):
         # TODO hooks
         if self.weapon.type == weapon:
             return
         self.weapon = weapons.WEAPONS[weapon](self)
-        await self.kill(KILL.CLASS_CHANGE, respawn_time=respawn_time)
+        self.protocol.loop.create_task(self.kill(KILL.CLASS_CHANGE, respawn_time=respawn_time))
 
-    async def set_team(self, team: TEAM, respawn_time=None):
+    def set_team(self, team: TEAM, respawn_time=None):
         # TODO hooks
         if self.team.id == team:
             return
         old_team = self.team
         self.team = self.protocol.teams[team]
         if old_team.spectator:
-            await self.spawn()
+            self.spawn()
         else:
-            await self.kill(KILL.TEAM_CHANGE, respawn_time=respawn_time)
+            self.protocol.loop.create_task(self.kill(KILL.TEAM_CHANGE, respawn_time=respawn_time))
 
-    async def destroy_block(self, x: int, y: int, z: int, destroy_type: ACTION=ACTION.DESTROY):
-        hook = await self.try_destroy_block(self, x, y, z, destroy_type)
+    def destroy_block(self, x: int, y: int, z: int, destroy_type: ACTION=ACTION.DESTROY):
+        hook = self.try_destroy_block(self, x, y, z, destroy_type)
         if hook is False:
             return False
         if hook is not None:
@@ -315,15 +321,15 @@ class ServerConnection(base.BaseConnection):
         block_action.player_id = self.id
         block_action.xyz = (x, y, z)
         block_action.value = destroy_type
-        await self.protocol.broadcast_loader(block_action)
+        self.protocol.broadcast_loader(block_action)
         self.protocol.loop.create_task(self.on_destroy_block(self, x, y, z, destroy_type))
         return True
 
-    async def build_block(self, x: int, y: int, z: int) -> bool:
+    def build_block(self, x: int, y: int, z: int) -> bool:
         if not self.block.build() or not self.block.check_rapid():
             return False
 
-        hook = await self.try_build_block(self, x, y, z)
+        hook = self.try_build_block(self, x, y, z)
         if hook is False:
             return False
         if hook is not None:
@@ -333,12 +339,12 @@ class ServerConnection(base.BaseConnection):
             block_action.player_id = self.id
             block_action.xyz = (x, y, z)
             block_action.value = ACTION.BUILD
-            await self.protocol.broadcast_loader(block_action)
+            self.protocol.broadcast_loader(block_action)
             self.protocol.loop.create_task(self.on_build_block(self, x, y, z))
             return True
         return False
 
-    async def build_line(self, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int) -> bool:
+    def build_line(self, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int) -> bool:
         if not self.block.check_rapid(primary=False):
             return False
 
@@ -363,10 +369,10 @@ class ServerConnection(base.BaseConnection):
         block_line.player_id = self.id
         block_line.xyz1 = x1, y1, z1
         block_line.xyz2 = x2, y2, z2
-        await self.protocol.broadcast_loader(block_line)
+        self.protocol.broadcast_loader(block_line)
         return True
 
-    async def set_position(self, x=None, y=None, z=None, reset=True):
+    def set_position(self, x=None, y=None, z=None, reset=True):
         if x is None or y is None:
             x, y, z = self.position.xyz
         else:
@@ -375,26 +381,26 @@ class ServerConnection(base.BaseConnection):
         print(f"Setting pos to {x}, {y}, {z}")
         self.wo.set_position(x, y, z, reset)
         position_data.data.xyz = x, y, z
-        await self.send_loader(position_data)
+        self.send_loader(position_data)
 
-    async def restock(self):
-        await self.set_hp(100)
+    def restock(self):
+        self.set_hp(100)
         [tool.restock() for tool in self.tools]
-        await self.send_loader(restock)
+        self.send_loader(restock)
 
     async def play_sound(self, sound: types.Sound):
         pkt = sound.to_play_sound()
-        await self.send_loader(pkt)
+        self.send_loader(pkt)
 
     # Chat Message Related
     @util.static_vars(wrapper=textwrap.TextWrapper(width=MAX_CHAT_SIZE))
-    async def send_message(self, message: str, chat_type=CHAT.SYSTEM, player_id=0xFF):
+    def send_message(self, message: str, chat_type=CHAT.SYSTEM, player_id=0xFF):
         chat_message.chat_type = chat_type
         chat_message.player_id = player_id
         lines: List[str] = self.send_message.wrapper.wrap(message)
         for line in lines:
             chat_message.value = line
-            await self.send_loader(chat_message)
+            self.send_loader(chat_message)
 
     def send_chat_message(self, message: str, sender: 'ServerConnection', team: bool=False):
         chat_type = CHAT.TEAM if team else CHAT.ALL
@@ -407,22 +413,23 @@ class ServerConnection(base.BaseConnection):
         return self.send_message(message, chat_type=CHAT.BIG)
 
     @on_loader_receive(packets.PositionOrientationData)
-    async def recv_client_update(self, loader: packets.PositionOrientationData):
+    def recv_client_update(self, loader: packets.PositionOrientationData):
         if self.dead: return
 
         px, py, pz = loader.data.p.xyz
         ox, oy, oz = loader.data.o.xyz
+        print(f"{ox} {oy} {oz}")
         if util.bad_float(px, py, pz, ox, oy, oz):
-            return await self.disconnect()
+            return self.disconnect()
 
         if math3d.Vector3(px, py, pz).sq_distance(self.wo.position) >= 3 ** 2:
-            await self.set_position(reset=False)
+            self.set_position(reset=False)
         else:
             self.wo.set_position(px, py, pz)
         self.wo.set_orientation(ox, oy, oz)
 
     @on_loader_receive(packets.InputData)
-    async def recv_input_data(self, loader: packets.InputData):
+    def recv_input_data(self, loader: packets.InputData):
         if self.dead: return
 
         walk = loader.up, loader.down, loader.left, loader.right
@@ -435,18 +442,18 @@ class ServerConnection(base.BaseConnection):
         self.protocol.loop.create_task(self.on_animation_change(self, *animation))
 
         loader.player_id = self.id
-        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
+        self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
     @on_loader_receive(packets.ExistingPlayer)
-    async def recv_existing_player(self, loader: packets.ExistingPlayer):
+    def recv_existing_player(self, loader: packets.ExistingPlayer):
         if loader.weapon not in weapons.WEAPONS or loader.team not in self.protocol.teams:
-            return await self.disconnect()
+            return self.disconnect()
 
         self.name = self.validate_name(loader.name)
         self.weapon = weapons.WEAPONS[loader.weapon](self)
         self.team = self.protocol.teams[loader.team]
-        await self.on_player_join(self)
-        await self.spawn()
+        self.protocol.loop.create_task(self.on_player_join(self))
+        self.spawn()
 
     def validate_name(self, name: str):
         name = name.strip()
@@ -462,27 +469,21 @@ class ServerConnection(base.BaseConnection):
         return new_name
 
     @on_loader_receive(packets.ChatMessage)
-    async def recv_chat_message(self, loader: packets.ChatMessage):
+    def recv_chat_message(self, loader: packets.ChatMessage):
         if loader.chat_type not in (CHAT.TEAM, CHAT.ALL):
             return
-        hook = await self.try_chat_message(self, loader.value, loader.chat_type)
+        hook = self.try_chat_message(self, loader.value, loader.chat_type)
         if hook is False:
             return
         message = hook or loader.value
         if loader.chat_type == CHAT.TEAM:
-            await self.team.broadcast_chat_message(message, sender=self)
+            self.team.broadcast_chat_message(message, sender=self)
         else:
-            await self.protocol.broadcast_chat_message(message, sender=self)
+            self.protocol.broadcast_chat_message(message, sender=self)
         self.protocol.loop.create_task(self.on_chat_message(self, loader.value, loader.chat_type))
 
-        # chat_message.player_id = self.id
-        # chat_message.chat_type = ChatType.ALL if loader.chat_type == ChatType.ALL else ChatType.TEAM
-        # chat_message.value = loader.value
-        # predicate = lambda conn: conn.team == self.team if loader.chat_type == ChatType.TEAM else None
-        # await self.protocol.broadcast_loader(chat_message, predicate=predicate)
-
     @on_loader_receive(packets.BlockAction)
-    async def recv_block_action(self, loader: packets.BlockAction):
+    def recv_block_action(self, loader: packets.BlockAction):
         if self.dead: return
 
         if loader.value == ACTION.GRENADE:
@@ -491,63 +492,63 @@ class ServerConnection(base.BaseConnection):
         if loader.value == ACTION.BUILD:
             if self.tool_type != TOOL.BLOCK:
                 return
-            await self.build_block(loader.x, loader.y, loader.z)
+            self.build_block(loader.x, loader.y, loader.z)
         else:
-            await self.destroy_block(loader.x, loader.y, loader.z, loader.value)
+            self.destroy_block(loader.x, loader.y, loader.z, loader.value)
 
     @on_loader_receive(packets.BlockLine)
-    async def recv_block_line(self, loader: packets.BlockLine):
+    def recv_block_line(self, loader: packets.BlockLine):
         if self.dead or self.tool_type != TOOL.BLOCK: return
-        await self.build_line(loader.x1, loader.y1, loader.z1, loader.x2, loader.y2, loader.z2)
+        self.build_line(loader.x1, loader.y1, loader.z1, loader.x2, loader.y2, loader.z2)
 
     @on_loader_receive(packets.WeaponInput)
-    async def recv_weapon_input(self, loader: packets.WeaponInput):
+    def recv_weapon_input(self, loader: packets.WeaponInput):
         if self.dead: return
 
         loader.primary = self.tool.set_primary(loader.primary)
         loader.secondary = self.tool.set_secondary(loader.secondary)
         loader.player_id = self.id
         self.wo.set_fire(loader.primary, loader.secondary)
-        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
+        self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
     @on_loader_receive(packets.WeaponReload)
-    async def recv_weapon_reload(self, loader: packets.WeaponReload):
+    def recv_weapon_reload(self, loader: packets.WeaponReload):
         if self.dead: return
         reloading = self.tool.reload()
         if reloading:
             loader.player_id = self.id
-            await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
+            self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
     @on_loader_receive(packets.ChangeClass)
-    async def recv_change_class(self, loader: packets.ChangeClass):
-        await self.set_weapon(loader.class_id)
+    def recv_change_class(self, loader: packets.ChangeClass):
+        self.set_weapon(loader.class_id)
 
     @on_loader_receive(packets.ChangeTeam)
-    async def recv_change_team(self, loader: packets.ChangeTeam):
-        await self.set_team(loader.team)
+    def recv_change_team(self, loader: packets.ChangeTeam):
+        self.set_team(loader.team)
 
     @on_loader_receive(packets.SetTool)
-    async def recv_set_tool(self, loader: packets.SetTool):
+    def recv_set_tool(self, loader: packets.SetTool):
         if self.dead: return
 
         self.wo.set_weapon(loader.value in (TOOL.WEAPON, TOOL.SNIPER))
-        await self.set_tool(loader.value)
+        self.set_tool(loader.value)
 
     @on_loader_receive(packets.SetColor)
-    async def recv_set_color(self, loader: packets.SetColor):
+    def recv_set_color(self, loader: packets.SetColor):
         if self.dead or self.tool_type != TOOL.BLOCK: return
 
         self.block.color.rgb = loader.color.rgb
         loader.player_id = self.id
-        await self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
+        self.protocol.broadcast_loader(loader, predicate=lambda conn: conn is not self)
 
     @on_loader_receive(packets.UseOrientedItem)
-    async def recv_oriented_item(self, loader: packets.UseOrientedItem):
+    def recv_oriented_item(self, loader: packets.UseOrientedItem):
         if self.dead:
             return
 
         if util.bad_float(*loader.position.xyz, *loader.velocity.xyz, loader.value):
-            return await self.disconnect()
+            return self.disconnect()
 
         position = validate(math3d.Vector3(*loader.position.xyz), self.wo.position).xyz
         velocity = loader.velocity.xyz
@@ -571,10 +572,10 @@ class ServerConnection(base.BaseConnection):
 
         if obj_type is not None:
             obj: types.Explosive = self.protocol.create_object(obj_type, self, position, velocity, loader.value)
-            await obj.broadcast_item(lambda conn: conn is not self)
+            obj.broadcast_item()
 
     @on_loader_receive(packets.HitPacket)
-    async def recv_hit_packet(self, loader: packets.HitPacket):
+    def recv_hit_packet(self, loader: packets.HitPacket):
         # TODO this is a bit of a mess
         if self.dead:
             return
@@ -625,18 +626,18 @@ class ServerConnection(base.BaseConnection):
         if damage is None:
             return
         print("?")
-        await other.hurt(damage=damage, cause=cause, damager=self)
+        other.hurt(damage=damage, cause=cause, damager=self)
 
     @on_loader_receive(packets.PlaceMG)
-    async def recv_place_mg(self, loader: packets.PlaceMG):
+    def recv_place_mg(self, loader: packets.PlaceMG):
         x, y, z = loader.xyz
         yaw = loader.yaw
         if util.bad_float(yaw):
-            return await self.disconnect()
-        await self.protocol.create_entity(types.MachineGun, position=(x, y, z), yaw=yaw, team=self.team)
+            return self.disconnect()
+        self.protocol.create_entity(types.MachineGun, position=(x, y, z), yaw=yaw, team=self.team)
 
     @on_loader_receive(packets.UseCommand)
-    async def recv_use_command(self, loader: packets.UseCommand):
+    def recv_use_command(self, loader: packets.UseCommand):
         self.protocol.loop.create_task(self.on_use_command(self))
 
     def update(self, dt):
@@ -644,7 +645,7 @@ class ServerConnection(base.BaseConnection):
 
         fall_dmg: int = self.wo.update(dt, self.protocol.time)
         if fall_dmg > 0:
-            self.protocol.loop.create_task(self.hurt(fall_dmg))
+            self.hurt(fall_dmg)
         self.tool.update(dt)
 
     def to_existing_player(self) -> packets.ExistingPlayer:
@@ -709,35 +710,37 @@ class ServerConnection(base.BaseConnection):
 
     # Called before/after spawning the player
     # (self, x, y, z) -> None | `x, y, z` to override | False to cancel
-    try_player_spawn = util.AsyncEvent(overridable=True)
+    try_player_spawn = util.Event(overridable=True)
     # (self, x, y, z) -> None
     on_player_spawn = util.AsyncEvent()
 
     # Called before/after the player is hurt
     # (self, damage, damager, position) -> None | `damage` to override | False to cancel
-    try_player_hurt = util.AsyncEvent(overridable=True)
+    try_player_hurt = util.Event(overridable=True)
     # (self, damage, damager, position) -> None
     on_player_hurt = util.AsyncEvent()
 
     # Called before/after the player dies
-    # (self, kill_type, killer) -> None
+    # (self, kill_type, killer, respawn_time) -> None | `respawn_time` to override | False to cancel
+    try_player_kill = util.Event(overridable=True)
+    # (self, kill_type, killer, respawn_time) -> None
     on_player_kill = util.AsyncEvent()
 
     # Called before/after the player builds
     # (self, x, y, z) -> None | `x, y, z` to override | False to cancel
-    try_build_block = util.AsyncEvent(overridable=True)
+    try_build_block = util.Event(overridable=True)
     # (self, x, y, z) -> None
     on_build_block = util.AsyncEvent()
 
     # Called before/after the player destroys
     # (self, x, y, z, destroy_type) -> None | `x, y, z` to override | False to cancel
-    try_destroy_block = util.AsyncEvent(overridable=True)
+    try_destroy_block = util.Event(overridable=True)
     # (self, x, y, z, destroy_type) -> None
     on_destroy_block = util.AsyncEvent()
 
     # Called before/after the player sends a chat message
     # (self, chat_message, chat_type) -> None | `chat_message` to override | False to cancel
-    try_chat_message = util.AsyncEvent(overridable=True)
+    try_chat_message = util.Event(overridable=True)
     # (self, chat_message, chat_type) -> None
     on_chat_message = util.AsyncEvent()
 
@@ -759,8 +762,8 @@ class ServerConnection(base.BaseConnection):
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name}, pos={self.position}, tool={self.tool})>"
 
 
-def validate(vec1: math3d.Vector3, vec2: math3d.Vector3) -> math3d.Vector3:
-    if vec1.sq_distance(vec2) >= 3 ** 2:
-        return vec2
+def validate(client: math3d.Vector3, server: math3d.Vector3) -> math3d.Vector3:
+    if client.sq_distance(server) >= 3 ** 2:
+        return server
     else:
-        return vec1
+        return client

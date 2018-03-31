@@ -9,12 +9,10 @@ from aceserver.connection import ServerConnection
 from aceserver.loaders import progress_bar
 
 
-
 DEFAULT_CAPTURE_DISTANCE = 16
 DEFAULT_CAPTURE_RATE = 0.05
 DEFAULT_TERRITORY_COUNT = 7
 DEFAULT_SPAWN_RADIUS = 32
-
 
 
 class Territory(types.CommandPost):
@@ -52,7 +50,7 @@ class Territory(types.CommandPost):
             # Stop showing the progress bar to players that left
             left = set(old) - set(self.players)
             progress_bar.stopped = True
-            self.protocol._broadcast_loader(progress_bar.generate(), connections=left)
+            self.protocol.broadcast_loader(progress_bar, connections=left)
 
             if not old and self.players:
                 # there werent any players on it last update but there are now
@@ -84,9 +82,9 @@ class Territory(types.CommandPost):
         if team != self.team:
             self.protocol.loop.create_task(self.set_team(team))
 
-    async def set_team(self, team: types.Team=None):
-        await super().set_team(team)
-        await self.on_captured(self, team)
+    def set_team(self, team: types.Team=None, force=False):
+        super().set_team(team, force)
+        self.protocol.loop.create_task(self.on_captured(self, team))
 
     @property
     def rate(self):
@@ -100,7 +98,7 @@ class Territory(types.CommandPost):
         progress_bar.set(self._progress, rate)
         progress_bar.color1.rgb = self.protocol.team1.color
         progress_bar.color2.rgb = self.protocol.team2.color
-        self.protocol._broadcast_loader(progress_bar.generate(), connections=self.players)
+        self.protocol.broadcast_loader(progress_bar, connections=self.players)
 
     def get_spawn_location(self, radius=DEFAULT_SPAWN_RADIUS):
         x1 = max(0, self.position.x - radius)
@@ -134,10 +132,10 @@ First team to capture all {self.score_limit} territories win.
         Territory.on_start_capture += self.on_territory_start_capture
 
         self.territories: List[Territory] = []
-        await self.spawn_ents()
+        self.spawn_ents()
         self.update_scores()
 
-    async def spawn_ents(self):
+    def spawn_ents(self):
         # Limit to middleish area of the map.
         l = self.protocol.map.length()
         y1 = l * (3 / 8)
@@ -154,9 +152,9 @@ First team to capture all {self.score_limit} territories win.
             elif x > (self.score_limit - 1) // 2:
                 team = self.protocol.team2
 
-            cp = await self.protocol.create_entity(Territory, position, team,
-                                                   capture_radius=self.config.get("capture_radius"),
-                                                   capture_rate=self.config.get("capture_rate"))
+            cp = self.protocol.create_entity(Territory, position, team,
+                                             capture_radius=self.config.get("capture_radius"),
+                                             capture_rate=self.config.get("capture_rate"))
             self.territories.append(cp)
 
     async def deinit(self):
@@ -171,14 +169,14 @@ First team to capture all {self.score_limit} territories win.
     async def on_territory_captured(self, territory: Territory, capturing: types.Team):
         grid = self.protocol.map.to_grid(territory.position.x, territory.position.y)
         msg = f"{capturing.name} team captured {grid}" if capturing is not None else f"{grid} has been neutralized"
-        await self.protocol.broadcast_hud_message(msg)
+        self.protocol.broadcast_hud_message(msg)
         self.update_scores()
 
     async def on_territory_start_capture(self, territory: Territory, capturing: types.Team):
         if capturing is territory.team:
             return
         grid = self.protocol.map.to_grid(territory.position.x, territory.position.y)
-        await self.protocol.broadcast_hud_message(f"{capturing.name} team is capturing {grid}")
+        self.protocol.broadcast_hud_message(f"{capturing.name} team is capturing {grid}")
 
     def get_spawn_point(self, player: ServerConnection) -> Tuple[int, int, int]:
         # TODO: maybe choose the controlled Territory closest to the enemy side?

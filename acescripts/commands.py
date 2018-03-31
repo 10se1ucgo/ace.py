@@ -112,7 +112,7 @@ class CommandsScript(Script):
                     self.commands.pop(alias)
                 self.commands.pop(command.name)
 
-    async def try_chat_message(self, connection: ServerConnection, message: str, type: CHAT):
+    def try_chat_message(self, connection: ServerConnection, message: str, type: CHAT):
         if not message.startswith(self.command_prefix):
             return
 
@@ -120,22 +120,25 @@ class CommandsScript(Script):
         if not fragments:
             return
 
+        self.protocol.loop.create_task(self.real_try_chat(connection, fragments))
+        return False
+
+    async def real_try_chat(self, connection: ServerConnection, fragments: list):
         command_name = fragments[0]
         command = self.commands.get(command_name)
         if not command:
-            await connection.send_server_message("That command doesn't exist.")
-            return False
+            connection.send_server_message("That command doesn't exist.")
+            return
         if not can_invoke(connection, command):
-            await connection.send_server_message("You do not have permission to use that command.")
-            return False
+            connection.send_server_message("You do not have permission to use that command.")
+            return
 
         try:
             await command(connection, fragments[1:])
         except Exception:
-            await connection.send_server_message(f"Error executing command {command.name}, not enough or malformed arguments")
+            connection.send_server_message(f"Error executing command {command.name}, not enough or malformed arguments")
             print(f"Ignoring error in command {command.name}", file=sys.stderr)
             traceback.print_exc()
-        return False
 
     async def on_player_connect(self, connection: ServerConnection):
         if ipaddress.ip_address(connection.peer.address.host).is_private:
@@ -145,12 +148,12 @@ class CommandsScript(Script):
     async def login(self, connection: ServerConnection, password: str):
         if password in self.config.get("admin_passwords", ()):
             connection.store["commands_admin"] = True
-            await connection.send_server_message("You logged in as an admin -- all rights granted.")
+            connection.send_server_message("You logged in as an admin -- all rights granted.")
 
         for name, options in self.config.get("roles", {}).items():
             if password in options.get("passwords", ()):
                 connection.store.setdefault("commands_permissions", set()).update(options.get("permissions", ()))
-                await connection.send_server_message(f"You logged in as {name}")
+                connection.send_server_message(f"You logged in as {name}")
 
     def on_scripts_loaded(self, scripts):
         for script in scripts.values():

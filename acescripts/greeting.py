@@ -20,7 +20,7 @@ class GreetingScript(Script):
         await connection.play_sound(self.intro_sound)
 
     async def greet(self, connection: ServerConnection):
-        await connection.send_hud_message(f"Welcome to the server, {connection.name}!")
+        connection.send_hud_message(f"Welcome to the server, {connection.name}!")
         await self.protocol.broadcast_server_message(f"{connection.name} has joined the server.")
 
 

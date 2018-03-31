@@ -16,10 +16,10 @@ class CensorScript(Script):
         # TODO find a cleaner way to have this
         ServerConnection.try_chat_message += self.censor
 
-    async def censor(self, connection: ServerConnection, message: str, type: int):
+    def censor(self, connection: ServerConnection, message: str, type: int):
         if any(really_bad_word in message for really_bad_word in self.really_bad_words):
             # returning False completely cancels the hook, and prevents the message from being sent
-            await connection.send_server_message(f"Watch your profanity, {connection.name}!")
+            connection.send_server_message(f"Watch your profanity, {connection.name}!")
             return False
 
         for bad_word in self.bad_words:

@@ -36,11 +36,11 @@ class GameMode:
         self.protocol.loop.create_task(self.on_game_end(winner))
         if winner is not None:
             await self.win_sound.play()
-            await self.protocol.broadcast_hud_message(f"{winner.name} team wins!")
+            self.protocol.broadcast_hud_message(f"{winner.name} team wins!")
         await self.deinit()
         await self.init()
         for player in self.protocol.players.values():
-            await player.spawn()
+            player.spawn()
         for team in self.protocol.teams.values():
             team.reset()
 
@@ -53,7 +53,7 @@ class GameMode:
         pass
 
     async def on_health_crate(self, crate: types.HealthCrate, connection: 'connection.ServerConnection'):
-        await connection.set_hp(100)
+        connection.set_hp(100)
         crate.destroy()
 
     async def on_ammo_crate(self, crate: types.AmmoCrate, connection: 'connection.ServerConnection'):
@@ -61,19 +61,20 @@ class GameMode:
         await connection.weapon.send_ammo()
         crate.destroy()
 
-    async def on_player_kill(self, player: 'connection.ServerConnection', kill_type: constants.KILL, killer: 'connection.ServerConnection'):
+    async def on_player_kill(self, player: 'connection.ServerConnection', kill_type: constants.KILL, killer: 'connection.ServerConnection',
+                             respawn_time: int):
         if not killer or killer is player:
             # suicide
             player.score -= 1
         else:
             killer.score += 1
 
-    def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[int, int, int]:
+    def get_spawn_point(self, player: 'connection.ServerConnection') -> Tuple[float, float, float]:
         x, y, z = self.get_random_pos(player.team)
         return x + 0.5, y + 0.5, z - 2
 
     def get_random_pos(self, team) -> Tuple[int, int, int]:
-        sections = self.protocol.map.width() / 8
+        sections = self.protocol.map.width() // 8
         offset = team.id * (self.protocol.map.width() - (sections * 2))
         x, y, z = self.protocol.map.get_random_pos(0 + offset, 0, (sections * 2) + offset, self.protocol.map.width())
         return x, y, z
@@ -82,7 +83,7 @@ class GameMode:
     on_game_end = util.AsyncEvent()
 
 
-def get_game_mode(protocol: 'protocol.ServerProtocol', mode_name: str):
+def get_game_mode(protocol: 'protocol.ServerProtocol', mode_name: str) -> GameMode:
     module = importlib.import_module(f"acemodes.{mode_name}")
     mode = module.init(protocol)
     if not isinstance(mode, GameMode):

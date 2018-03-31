@@ -16,13 +16,13 @@ class Sound:
         self.position = position
 
     async def play(self, predicate=None):
-        await self.protocol.broadcast_loader(self.to_play_sound(), predicate=predicate)
+        self.protocol.broadcast_loader(self.to_play_sound(), predicate=predicate)
 
     async def stop(self, predicate=None):
         if self.id is None:
             return
         stop_sound.loop_id = self.id
-        await self.protocol.broadcast_loader(stop_sound, predicate=predicate)
+        self.protocol.broadcast_loader(stop_sound, predicate=predicate)
 
     def destroy(self):
         self.protocol.loop.create_task(self.stop())
@@ -81,7 +81,7 @@ class Team:
         loaders.set_score.type = SCORE.TEAM
         loaders.set_score.specifier = self.id
         loaders.set_score.value = self._score
-        self.protocol._broadcast_loader(loaders.set_score.generate())
+        self.protocol.broadcast_loader(loaders.set_score)
 
     def __str__(self):
         return f"{self.name} team"
@@ -117,7 +117,7 @@ class Entity:
     def do_gravity(self):
         z = self.protocol.map.get_z(self.position.x, self.position.y, self.position.z - 1)
         if z != self.position.z:
-            self.protocol.loop.create_task(self.set_position(self.position.x, self.position.y, z))
+            self.set_position(self.position.x, self.position.y, z)
 
     def do_collide(self):
         if not self.carrier and self.on_collide:
@@ -128,7 +128,7 @@ class Entity:
                 if dist <= 3 ** 2:
                     self.protocol.loop.create_task(self.on_collide(self, conn))
 
-    async def set_team(self, team: Team=None, force=False):
+    def set_team(self, team: Team=None, force=False):
         if self.destroyed:
             return
         if not force and team is self.team:
@@ -138,18 +138,18 @@ class Entity:
         change_entity.entity_id = self.id
         change_entity.type = SET.STATE
         change_entity.state = state
-        await self.protocol.broadcast_loader(change_entity)
+        self.protocol.broadcast_loader(change_entity)
 
-    async def set_position(self, x: float, y: float, z: float):
+    def set_position(self, x: float, y: float, z: float):
         if self.destroyed:
             return
         self.position.set(x, y, z)
         change_entity.entity_id = self.id
         change_entity.type = SET.POSITION
         change_entity.position.xyz = self.position.xyz
-        await self.protocol.broadcast_loader(change_entity)
+        self.protocol.broadcast_loader(change_entity)
 
-    async def set_carrier(self, carrier: 'connection.ServerConnection'=None, force=False):
+    def set_carrier(self, carrier: 'connection.ServerConnection'=None, force=False):
         if self.destroyed:
             return
         if not force and carrier is self.carrier:
@@ -159,13 +159,13 @@ class Entity:
         change_entity.entity_id = self.id
         change_entity.type = SET.CARRIER
         change_entity.carrier = player
-        await self.protocol.broadcast_loader(change_entity)
+        self.protocol.broadcast_loader(change_entity)
 
     def destroy(self):
         if self.destroyed:
             return
         self.destroyed = True
-        self.protocol.loop.create_task(self.protocol.destroy_entity(self))
+        self.protocol.destroy_entity(self)
 
     def to_loader(self):
         if self.destroyed:
@@ -234,7 +234,7 @@ class MountableEntity(Entity):
             self.carrier.mounted_entity = None
         else:
             connection.mounted_entity = self
-        await self.set_carrier(connection)
+        self.set_carrier(connection)
 
     async def player_walk(self, connection, forward: bool, backward: bool, left: bool, right: bool):
         pass
@@ -288,9 +288,11 @@ class Explosive:
     def update(self, dt):
         pass
 
-    async def explode(self):
+    def explode(self):
+        self.destroy()
+
         x, y, z = self.wo.position.xyz
-        await self.thrower.destroy_block(int(x), int(y), int(z), ACTION.GRENADE)
+        self.thrower.destroy_block(int(x), int(y), int(z), ACTION.GRENADE)
         for player in self.protocol.players.values():
             if player.dead: continue
 
@@ -300,10 +302,10 @@ class Explosive:
                     damage = 100
                 else:
                     damage = 4096 / dist
-                await player.hurt(damage, KILL.GRENADE, self.thrower, self.position.xyz)
+                player.hurt(damage, KILL.GRENADE, self.thrower, self.position.xyz)
         self.protocol.loop.create_task(self.on_explode(self))
 
-    async def broadcast_item(self, predicate=None):
+    def broadcast_item(self, predicate=None):
         raise NotImplementedError
 
     def hit_test(self, player: 'connection.ServerConnection'):
@@ -337,19 +339,18 @@ class Grenade(Explosive):
         if bounced:
             self.protocol.loop.create_task(self.on_collide(self))
         if self.protocol.time >= self.explode_time:
-            self.destroy()
-            self.protocol.loop.create_task(self.explode())
+            self.explode()
 
     def next_collision(self, dt: float, max: float=5):
         return self.wo.next_collision(dt, max)
 
-    async def broadcast_item(self, predicate=None):
+    def broadcast_item(self, predicate=None):
         oriented_item.player_id = self.thrower.id
         oriented_item.value = self.fuse
         oriented_item.position.xyz = self.wo.position.xyz
         oriented_item.velocity.xyz = self.wo.velocity.xyz
         oriented_item.tool = TOOL.GRENADE
-        await self.protocol.broadcast_loader(oriented_item, predicate=predicate)
+        self.protocol.broadcast_loader(oriented_item, predicate=predicate)
 
     @property
     def fuse(self):
@@ -382,16 +383,15 @@ class Rocket(Explosive):
         # im not sure if the error is in my Matrix class or mat's, but mat4 * vec3 behaves differently
         # his implementation seems to multiply each matrix column by the vector, not each row, which is how i learned it
         # so instead of doing the proper thing (velocity = rotation * vec3(0, 0, -1)) we'll just emulate his version
-        velocity = tuple(-x for x in rotation.get_row(2)[:3])
-        velocity = math3d.Vector3(velocity[0], velocity[2], -velocity[1])
+        velocity = tuple(x for x in rotation.get_row(2)[:3])
+        velocity = math3d.Vector3(-velocity[0], -velocity[2], velocity[1])
 
         f = dt * ROCKET_SPEED
         self.wo.position += velocity * f
 
         bounced = self.wo.update(dt, self.protocol.time)
         if bounced:
-            self.destroy()
-            self.protocol.loop.create_task(self.explode())
+            self.explode()
 
         self.pitch += math.radians(ROCKET_FALLOFF) * dt
 
@@ -416,10 +416,10 @@ class Rocket(Explosive):
 
     # a1 client is bork, assumes all UseOrientedItem packets are grenades.
     # (this is fixed in later builds)
-    async def broadcast_item(self, predicate=None):
+    def broadcast_item(self, predicate=None):
         oriented_item.player_id = self.thrower.id
         oriented_item.value = 0
         oriented_item.position.xyz = self.wo.position.xyz
         oriented_item.velocity.xyz = self.get_orientation()
         oriented_item.tool = TOOL.RPG
-        await self.protocol.broadcast_loader(oriented_item, predicate=predicate)
+        self.protocol.broadcast_loader(oriented_item, predicate=predicate)

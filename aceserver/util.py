@@ -27,7 +27,6 @@ class IDPool:
 class Event:
     def __init__(self, overridable=False):
         self._funcs = []
-        # TODO decide a name for this LUL
         self.overridable = overridable
 
     def __iadd__(self, other):

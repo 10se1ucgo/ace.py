@@ -16,24 +16,24 @@ from acescripts import Script, commands
 class EssentialsScript(Script):
     @commands.command(admin=True)
     async def setpos(self, connection: ServerConnection, x: float, y: float, z: float=None):
-        await connection.set_position(x, y, z)
+        connection.set_position(x, y, z)
 
     @commands.command(admin=True)
     async def sethp(self, connection: ServerConnection, hp: int):
-        await connection.set_hp(hp)
+        connection.set_hp(hp)
 
     @commands.command(admin=True)
     async def hurt(self, connection: ServerConnection, hp: int):
-        await connection.hurt(hp)
+        connection.hurt(hp)
 
     @commands.command(admin=True)
     async def tp(self, connection: ServerConnection, other: ServerConnection):
-        await connection.set_position(*other.position.xyz)
+        connection.set_position(*other.position.xyz)
 
     @commands.command(admin=True)
     async def goto(self, connection: ServerConnection, grid_pos: str):
         x, y = self.protocol.map.from_grid(grid_pos)
-        await connection.set_position(x, y)
+        connection.set_position(x, y)
 
     @commands.command(admin=True)
     async def spawn(self, connection: ServerConnection, type: types.Entity, num: int=1, x: float=None, y: float=None, z: float=None):
@@ -44,7 +44,7 @@ class EssentialsScript(Script):
                 if z is None:
                     z = self.protocol.map.get_z(x, y)
                 pos = (x, y, z)
-            await self.protocol.create_entity(ent_type=type, position=pos, team=connection.team)
+            self.protocol.create_entity(ent_type=type, position=pos, team=connection.team)
 
     @commands.command(admin=True)
     async def test_raycast(self, connection: ServerConnection):
@@ -52,7 +52,7 @@ class EssentialsScript(Script):
             pos = cast_ray(connection.protocol.map, connection.position, connection.orientation, length=256)
             if not pos:
                 continue
-            await connection.destroy_block(*pos)
+            connection.destroy_block(*pos)
             await asyncio.sleep(1 / 10)
 
     @commands.command(admin=True)
@@ -61,7 +61,7 @@ class EssentialsScript(Script):
         eta, pos = obj.next_collision(dt=1/60, max=20)
         if eta is not False:
             obj.fuse = eta
-        await obj.broadcast_item()
+        obj.broadcast_item()
 
     @commands.command(admin=True)
     async def fog(self, connection: ServerConnection, r: int, g: int, b: int):

@@ -38,13 +38,13 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
         self.c4_time = 40
 
         self.bomb: C4 = \
-            await self.protocol.create_entity(C4, position=self.get_random_pos(self.terrorists), team=self.counter_terrorists)
+            self.protocol.create_entity(C4, position=self.get_random_pos(self.terrorists), team=self.counter_terrorists)
         types.Flag.on_collide += self.on_pickup_bomb
 
         self.bombsite_a: types.CommandPost = \
-            await self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(self.counter_terrorists))
+            self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(self.counter_terrorists))
         self.bombsite_b: types.CommandPost = \
-            await self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(self.counter_terrorists))
+            self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(self.counter_terrorists))
         types.CommandPost.on_collide += self.on_site_collide
 
         self.plant_call = None
@@ -61,8 +61,8 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
 
         if player.team is self.terrorists:
             if bomb.planter: return
-            await bomb.set_carrier(player)
-            await self.protocol.broadcast_hud_message(f"{player} picked up the bomb.")
+            bomb.set_carrier(player)
+            self.protocol.broadcast_hud_message(f"{player} picked up the bomb.")
         elif player.team is self.counter_terrorists and bomb.planter is not None:
             pass # todo
 
@@ -78,20 +78,20 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
     async def delay_plant(self, player: ServerConnection):
         x, y, z = player.position.xyz
         for _ in reversed(range(5)):
-            await player.set_position(x, y, z)
+            player.set_position(x, y, z)
             if player.tool_type != TOOL.BLOCK:
                 return
-            await player.send_server_message(f"Planting, {_ + 1} seconds remaining.")
+            player.send_server_message(f"Planting, {_ + 1} seconds remaining.")
             await asyncio.sleep(1)
         await self.plant_bomb(player)
 
     async def plant_bomb(self, player: ServerConnection):
-        await self.bomb.set_carrier(None)
-        await self.bomb.set_team(player.team)
-        await self.bomb.set_position(*player.position.xyz)
+        self.bomb.set_carrier(None)
+        self.bomb.set_team(player.team)
+        self.bomb.set_position(*player.position.xyz)
         self.bomb.planter = player
 
-        await self.protocol.broadcast_hud_message(f"{player} planted the bomb.")
+        self.protocol.broadcast_hud_message(f"{player} planted the bomb.")
         await self.c4plant.play()
         self.protocol.loop.create_task(self.play_sounds())
 
@@ -102,7 +102,7 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
             percentage = (det - self.protocol.time) / self.c4_time
             await c4beep.play()
             await asyncio.sleep(percentage + .1)
-        await self.protocol.broadcast_hud_message("Boom.")
+        self.protocol.broadcast_hud_message("Boom.")
 
 
 def init(protocol: ServerProtocol):

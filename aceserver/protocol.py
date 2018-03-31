@@ -90,7 +90,7 @@ class ServerProtocol(base.BaseProtocol):
             if not conn.name or conn.dead:
                 continue
             world_update[conn.id] = (conn.position.xyz, conn.orientation)
-        self._broadcast_loader(world_update.generate(), flags=enet.PACKET_FLAG_UNSEQUENCED)
+        self.broadcast_loader(world_update, flags=enet.PACKET_FLAG_UNSEQUENCED)
 
     def _broadcast_loader(self, writer: ByteWriter, flags=enet.PACKET_FLAG_RELIABLE, predicate=None, connections=None):
         packet: enet.Packet = enet.Packet(bytes(writer), flags)
@@ -108,7 +108,7 @@ class ServerProtocol(base.BaseProtocol):
                 conn.peer.send(0, packet)
 
     def broadcast_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE, *, predicate=None, connections=None):
-        return self.loop.run_in_executor(None, self._broadcast_loader, loader.generate(), flags, predicate, connections)
+        return self._broadcast_loader(loader.generate(), flags, predicate, connections)
 
     TObj = TypeVar('TObj')
     def create_object(self, obj_type: Type[TObj], *args, **kwargs) -> TObj:
@@ -120,16 +120,16 @@ class ServerProtocol(base.BaseProtocol):
         self.objects.remove(obj)
 
     TEnt = TypeVar('TEnt')
-    async def create_entity(self, ent_type: Type[TEnt], *args, **kwargs) -> TEnt:
+    def create_entity(self, ent_type: Type[TEnt], *args, **kwargs) -> TEnt:
         ent = ent_type(self.entity_ids.pop(), self, *args, **kwargs)
         self.entities[ent.id] = ent
         create_entity.entity = ent.to_loader()
-        await self.broadcast_loader(create_entity)
+        self.broadcast_loader(create_entity)
         return ent
 
-    async def destroy_entity(self, ent: types.Entity):
+    def destroy_entity(self, ent: types.Entity):
         destroy_entity.entity_id = ent.id
-        await self.broadcast_loader(destroy_entity)
+        self.broadcast_loader(destroy_entity)
         self.entities.pop(ent.id)
         self.entity_ids.push(ent.id)
 
@@ -152,13 +152,13 @@ class ServerProtocol(base.BaseProtocol):
         self.color_ids.push(id)
 
     @util.static_vars(wrapper=textwrap.TextWrapper(width=MAX_CHAT_SIZE))
-    async def broadcast_message(self, message: str, chat_type=CHAT.SYSTEM, player_id=0xFF, predicate=None):
+    def broadcast_message(self, message: str, chat_type=CHAT.SYSTEM, player_id=0xFF, predicate=None):
         chat_message.chat_type = chat_type
         chat_message.player_id = player_id
         lines: List[str] = self.broadcast_message.wrapper.wrap(message)
         for line in lines:
             chat_message.value = line
-            await self.broadcast_loader(chat_message, predicate=predicate)
+            self.broadcast_loader(chat_message, predicate=predicate)
 
     def broadcast_chat_message(self, message: str, sender: connection.ServerConnection, team: types.Team=None):
         predicate = (lambda conn: conn.team == team) if team else None
@@ -173,7 +173,7 @@ class ServerProtocol(base.BaseProtocol):
         predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=CHAT.BIG, predicate=predicate)
 
-    def set_fog_color(self, r: int, g: int, b: int, save=True):
+    async def set_fog_color(self, r: int, g: int, b: int, save=True):
         r &= 255
         g &= 255
         b &= 255
@@ -193,11 +193,11 @@ class ServerProtocol(base.BaseProtocol):
 
         for ent in self.entities.values():
             if ent.carrier and ent.carrier.id == ply.id:
-                await ent.set_carrier(None, force=True)
+                ent.set_carrier(None, force=True)
 
         if ply:  # PlayerLeft will crash the clients if the left player didn't actually join the game.
             player_left.player_id = conn.id
-            await self.broadcast_loader(player_left)
+            self.broadcast_loader(player_left)
 
     async def send_entity_carriers(self, conn: 'connection.ServerConnection'):
         """
@@ -208,7 +208,7 @@ class ServerProtocol(base.BaseProtocol):
         """
         for ent in self.entities.values():
             if ent.carrier is not None:
-                await ent.set_carrier(ent.carrier, force=True)
+                ent.set_carrier(ent.carrier, force=True)
 
     def get_state(self):
         state_data.fog_color.rgb = self.fog_color

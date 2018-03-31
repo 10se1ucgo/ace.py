@@ -24,17 +24,13 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
         team1 = self.protocol.team1
         team2 = self.protocol.team2
 
-        self.team1_intel = \
-            await self.protocol.create_entity(types.Flag, position=self.get_random_pos(team1), team=team1)
-        self.team2_intel = \
-            await self.protocol.create_entity(types.Flag, position=self.get_random_pos(team2), team=team2)
+        self.team1_intel = self.protocol.create_entity(types.Flag, position=self.get_random_pos(team1), team=team1)
+        self.team2_intel = self.protocol.create_entity(types.Flag, position=self.get_random_pos(team2), team=team2)
         self.intels = {self.team1_intel.team: self.team1_intel, self.team2_intel.team: self.team2_intel}
         types.Flag.on_collide += self.on_intel_collide
 
-        self.team1_cp = \
-            await self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(team1), team=team1)
-        self.team2_cp = \
-            await self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(team2), team=team2)
+        self.team1_cp = self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(team1), team=team1)
+        self.team2_cp = self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(team2), team=team2)
         self.cps = {self.team1_cp.team: self.team1_cp, self.team2_cp.team: self.team2_cp}
         types.CommandPost.on_collide += self.on_cp_collide
 
@@ -42,6 +38,7 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
 
         # self.crate_sound = self.protocol.create_sound("chopper")
         # self.crate_spawner_task = self.protocol.loop.create_task(self.spawn_crates())
+        ServerConnection.on_player_disconnect += self.drop_intel
 
     async def deinit(self):
         [intel.destroy() for intel in self.intels.values()]
@@ -61,8 +58,8 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
         if intel.team == player.team:
             return
 
-        await intel.set_carrier(player)
-        await self.protocol.broadcast_hud_message(f"{player} picked up the {intel.team} Intel")
+        intel.set_carrier(player)
+        self.protocol.broadcast_hud_message(f"{player} picked up the {intel.team} Intel")
         await self.pickup_sound.play()
 
     async def on_cp_collide(self, base: types.CommandPost, player: ServerConnection):
@@ -70,10 +67,10 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
             return
 
         if self.protocol.time - player.store.get("ctf_last_restock", 0) >= 3:
-            await player.restock()
+            player.restock()
             player.store["ctf_last_restock"] = self.protocol.time
 
-        for intel in self.intels:
+        for intel in self.intels.values():
             if intel.carrier == player:
                 await self.capture_intel(player, intel)
 
@@ -81,24 +78,24 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
         await self.reset_intel(intel)
         player.team.score += 1
         player.score += 10
-        await self.protocol.broadcast_hud_message(f"{player} captured the {intel.team} Intel")
+        self.protocol.broadcast_hud_message(f"{player} captured the {intel.team} Intel")
         self.check_win()
 
-    async def drop_intel(self, player: ServerConnection, intel: types.Flag):
-        await intel.set_carrier(None)
-        await intel.set_position(*player.position.xyz)
-        await self.protocol.broadcast_hud_message(f"{player} dropped the {intel.team} Intel")
+    async def drop_intel(self, player: ServerConnection):
+        for intel in self.intels.values():
+            if intel.carrier is not player:
+                continue
+            intel.set_carrier(None)
+            intel.set_position(*player.position.xyz)
+            self.protocol.broadcast_hud_message(f"{player} dropped the {intel.team} Intel")
 
     async def reset_intel(self, intel):
-        await intel.set_carrier(None)
-        await intel.set_position(*self.get_random_pos(intel.team))
+        intel.set_carrier(None)
+        intel.set_position(*self.get_random_pos(intel.team))
 
-    async def on_player_kill(self, player: ServerConnection, kill_type: KILL, killer: ServerConnection):
-        await super().on_player_kill(player, kill_type, killer)
-        for intel in self.intels:
-            if intel.carrier == player:
-                await self.drop_intel(player, intel)
-
+    async def on_player_kill(self, player: ServerConnection, kill_type: KILL, killer: ServerConnection, respawn_time: int):
+        await super().on_player_kill(player, kill_type, killer, respawn_time)
+        await self.drop_intel(player)
 
 def init(protocol: ServerProtocol):
     return CTF(protocol)

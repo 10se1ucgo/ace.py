@@ -8,13 +8,13 @@ from aceserver import util
 
 
 class BaseConnection:
-    async def on_connect(self, data):
+    def on_connect(self, data):
         pass
 
-    async def on_disconnect(self):
+    def on_disconnect(self):
         pass
 
-    async def on_receive(self, packet: enet.Packet):
+    def on_receive(self, packet: enet.Packet):
         pass
 
 
@@ -74,15 +74,12 @@ class BaseProtocol:
                     return
 
                 peer = event.peer
-                task = None
                 if event_type == enet.EVENT_TYPE_CONNECT:
-                    task = self.loop.create_task(self.on_connect(peer, event.data))
+                    self.on_connect(peer, event.data)
                 elif event_type == enet.EVENT_TYPE_DISCONNECT:
-                    task = self.loop.create_task(self.on_disconnect(peer))
+                    self.on_disconnect(peer)
                 elif event_type == enet.EVENT_TYPE_RECEIVE:
-                    task = self.loop.create_task(self.on_receive(peer, event.packet))
-                if task:
-                    task.add_done_callback(net_finish)
+                    self.on_receive(peer, event.packet)
             except:
                 print("Ignoring exception in net_loop(): ")
                 traceback.print_exc()
@@ -93,27 +90,27 @@ class BaseProtocol:
         self.connections[peer] = connection
         return connection
 
-    async def on_connect(self, peer: enet.Peer, data: int):
+    def on_connect(self, peer: enet.Peer, data: int):
         connection: typing.Optional[BaseConnection] = self.connections.get(peer)
         if connection is None:
             connection = self.connection_factory(self, peer)
             self.connections[peer] = connection
 
-        await connection.on_connect(data)
+        connection.on_connect(data)
 
-    async def on_disconnect(self, peer: enet.Peer):
+    def on_disconnect(self, peer: enet.Peer):
         connection: typing.Optional[BaseConnection] = self.connections.pop(peer, None)
         if not connection:
             return
 
-        await connection.on_disconnect()
+        connection.on_disconnect()
 
-    async def on_receive(self, peer: enet.Peer, packet: enet.Packet):
+    def on_receive(self, peer: enet.Peer, packet: enet.Packet):
         connection: typing.Optional[BaseConnection] = self.connections.get(peer)
         if not connection:
             return
 
-        await connection.on_receive(packet)
+        connection.on_receive(packet)
 
     def intercept(self, address: enet.Address, data: bytes):
         pass

@@ -15,17 +15,17 @@ class Sound:
         self.name = name
         self.position = position
 
-    async def play(self, predicate=None):
+    def play(self, predicate=None):
         self.protocol.broadcast_loader(self.to_play_sound(), predicate=predicate)
 
-    async def stop(self, predicate=None):
+    def stop(self, predicate=None):
         if self.id is None:
             return
         stop_sound.loop_id = self.id
         self.protocol.broadcast_loader(stop_sound, predicate=predicate)
 
     def destroy(self):
-        self.protocol.loop.create_task(self.stop())
+        self.stop()
         self.protocol.destroy_sound(self)
 
     def to_play_sound(self):
@@ -51,7 +51,7 @@ class Team:
 
     def players(self) -> Generator['connection.ServerConnection', None, None]:
         for conn in self.protocol.players.values():
-            if conn.player.team is self:
+            if conn.team is self:
                 yield conn
 
     def entities(self) -> Generator['Entity', None, None]:

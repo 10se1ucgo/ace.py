@@ -26,8 +26,9 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
     short_name = "de"
     score_limit = 10
 
-    async def init(self):
-        await super().init()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
         self.counter_terrorists = self.protocol.team1
         self.counter_terrorists.name = "Counter-Terrorists"
         self.counter_terrorists.color = (93,121,174)
@@ -36,22 +37,26 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
         self.terrorists.color = (222,155,53)
 
         self.c4_time = 40
+        self.plant_call = None
+
+        self.c4plant = self.protocol.create_sound("c4plant")
+
+        types.CommandPost.on_collide += self.on_site_collide
+        types.Flag.on_collide += self.on_pickup_bomb
+
+    def start(self):
+        super().start()
 
         self.bomb: C4 = \
             self.protocol.create_entity(C4, position=self.get_random_pos(self.terrorists), team=self.counter_terrorists)
-        types.Flag.on_collide += self.on_pickup_bomb
 
         self.bombsite_a: types.CommandPost = \
             self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(self.counter_terrorists))
         self.bombsite_b: types.CommandPost = \
             self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(self.counter_terrorists))
-        types.CommandPost.on_collide += self.on_site_collide
 
-        self.plant_call = None
 
-        self.c4plant = self.protocol.create_sound("c4plant")
-
-    async def deinit(self):
+    def stop(self):
         self.bomb.destroy()
         self.bombsite_a.destroy()
         self.bombsite_b.destroy()
@@ -92,7 +97,7 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
         self.bomb.planter = player
 
         self.protocol.broadcast_hud_message(f"{player} planted the bomb.")
-        await self.c4plant.play()
+        self.c4plant.play()
         self.protocol.loop.create_task(self.play_sounds())
 
     async def play_sounds(self):
@@ -100,7 +105,7 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
         det = self.protocol.time + self.c4_time
         while self.protocol.time < det:
             percentage = (det - self.protocol.time) / self.c4_time
-            await c4beep.play()
+            c4beep.play()
             await asyncio.sleep(percentage + .1)
         self.protocol.broadcast_hud_message("Boom.")
 

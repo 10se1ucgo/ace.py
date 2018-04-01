@@ -21,24 +21,26 @@ class GameMode:
         module_name = ''.join(str(self.__module__).split(".")[1:])  # strip package name
         self.config.update(protocol.config.get("modes." + module_name, {}))
 
-    async def init(self):
-        # TODO should this be in the base GameMode or should this just be default behaviour within these classes?
+        # TODO should this be in the base GameMode or should this just be default behaviour within these entities?
         types.HealthCrate.on_collide += self.on_health_crate
         types.AmmoCrate.on_collide += self.on_ammo_crate
         connection.ServerConnection.on_player_kill += self.on_player_kill
 
         self.win_sound = self.protocol.create_sound("horn")
 
-    async def deinit(self):
+    def start(self):
+        pass
+
+    def stop(self):
         pass
 
     async def reset(self, winner: types.Team=None):
         self.protocol.loop.create_task(self.on_game_end(winner))
         if winner is not None:
-            await self.win_sound.play()
+            self.win_sound.play()
             self.protocol.broadcast_hud_message(f"{winner.name} team wins!")
-        await self.deinit()
-        await self.init()
+        self.stop()
+        self.start()
         for player in self.protocol.players.values():
             player.spawn()
         for team in self.protocol.teams.values():
@@ -85,7 +87,7 @@ class GameMode:
 
 def get_game_mode(protocol: 'protocol.ServerProtocol', mode_name: str) -> GameMode:
     module = importlib.import_module(f"acemodes.{mode_name}")
-    mode = module.init(protocol)
+    mode = module.start(protocol)
     if not isinstance(mode, GameMode):
         raise TypeError(f"Mode {mode_name} did not return a GameMode instance!")
     return mode

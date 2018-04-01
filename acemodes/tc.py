@@ -80,7 +80,7 @@ class Territory(types.CommandPost):
             return
 
         if team != self.team:
-            self.protocol.loop.create_task(self.set_team(team))
+            self.set_team(team)
 
     def set_team(self, team: types.Team=None, force=False):
         super().set_team(team, force)
@@ -125,11 +125,13 @@ First team to capture all {self.score_limit} territories win.
     def score_limit(self):
         return self.config.get("territory_count", DEFAULT_TERRITORY_COUNT)
 
-    async def init(self):
-        await super().init()
-
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         Territory.on_captured += self.on_territory_captured
         Territory.on_start_capture += self.on_territory_start_capture
+
+    def start(self):
+        super().start()
 
         self.territories: List[Territory] = []
         self.spawn_ents()
@@ -157,7 +159,7 @@ First team to capture all {self.score_limit} territories win.
                                              capture_rate=self.config.get("capture_rate"))
             self.territories.append(cp)
 
-    async def deinit(self):
+    def stop(self):
         for ent in self.territories: ent.destroy()
         self.territories.clear()
 

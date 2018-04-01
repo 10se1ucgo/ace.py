@@ -17,11 +17,11 @@ class GreetingScript(Script):
         ServerConnection.on_player_join += self.greet
 
     async def intro(self, connection: ServerConnection):
-        await connection.play_sound(self.intro_sound)
+        connection.play_sound(self.intro_sound)
 
     async def greet(self, connection: ServerConnection):
         connection.send_hud_message(f"Welcome to the server, {connection.name}!")
-        await self.protocol.broadcast_server_message(f"{connection.name} has joined the server.")
+        self.protocol.broadcast_server_message(f"{connection.name} has joined the server.")
 
 
 def init(protocol: ServerProtocol):

@@ -29,7 +29,7 @@ class ScriptLoader:
             module = importlib.import_module(f"acescripts.{script_name}")
             if reload:
                 module = importlib.reload(module)
-            script = module.init(self.protocol)
+            script = module.start(self.protocol)
             if not isinstance(script, Script):
                 raise TypeError(f"Script {script_name} did not return a Script instance!")
             self.scripts[script_name] = script
@@ -37,7 +37,7 @@ class ScriptLoader:
 
     def unload_scripts(self):
         for script in reversed(self.scripts.values()):
-            script.deinit()
+            script.stop()
         self.on_scripts_unloaded(self.scripts)
         self.scripts = OrderedDict()
 

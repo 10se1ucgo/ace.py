@@ -18,8 +18,17 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
     short_name = "ctf"
     score_limit = 10
 
-    async def init(self):
-        await super().init()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.pickup_sound = self.protocol.create_sound("pickup")
+        ServerConnection.on_player_disconnect += self.drop_intel
+
+        types.Flag.on_collide += self.on_intel_collide
+        types.CommandPost.on_collide += self.on_cp_collide
+
+    def start(self):
+        super().start()
 
         team1 = self.protocol.team1
         team2 = self.protocol.team2
@@ -27,20 +36,14 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
         self.team1_intel = self.protocol.create_entity(types.Flag, position=self.get_random_pos(team1), team=team1)
         self.team2_intel = self.protocol.create_entity(types.Flag, position=self.get_random_pos(team2), team=team2)
         self.intels = {self.team1_intel.team: self.team1_intel, self.team2_intel.team: self.team2_intel}
-        types.Flag.on_collide += self.on_intel_collide
 
         self.team1_cp = self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(team1), team=team1)
         self.team2_cp = self.protocol.create_entity(types.CommandPost, position=self.get_random_pos(team2), team=team2)
         self.cps = {self.team1_cp.team: self.team1_cp, self.team2_cp.team: self.team2_cp}
-        types.CommandPost.on_collide += self.on_cp_collide
 
-        self.pickup_sound = self.protocol.create_sound("pickup")
+    def stop(self):
+        super().stop()
 
-        # self.crate_sound = self.protocol.create_sound("chopper")
-        # self.crate_spawner_task = self.protocol.loop.create_task(self.spawn_crates())
-        ServerConnection.on_player_disconnect += self.drop_intel
-
-    async def deinit(self):
         [intel.destroy() for intel in self.intels.values()]
         [cp.destroy() for cp in self.cps.values()]
 
@@ -60,7 +63,7 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
 
         intel.set_carrier(player)
         self.protocol.broadcast_hud_message(f"{player} picked up the {intel.team} Intel")
-        await self.pickup_sound.play()
+        self.pickup_sound.play()
 
     async def on_cp_collide(self, base: types.CommandPost, player: ServerConnection):
         if base.team != player.team:

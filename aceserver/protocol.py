@@ -36,9 +36,6 @@ class ServerProtocol(base.BaseProtocol):
                 self.packs.append((data, len(data), zlib.crc32(data)))
 
         self.player_ids = util.IDPool(stop=self.max_players)
-        # Client treats SetColor packets with player IDs >= 32 to be custom, server defined color data to store.
-        # BlockAction then can use these player IDs for custom colors.
-        self.color_ids = util.IDPool(start=32, stop=255)
         self.entity_ids = util.IDPool(stop=255)
         self.sound_ids = util.IDPool(stop=255)
 
@@ -64,7 +61,7 @@ class ServerProtocol(base.BaseProtocol):
 
     async def run(self):
         self.init_hooks()
-        await self.mode.init()
+        self.mode.start()
         self.scripts.load_scripts()
         await super().run()
 
@@ -145,12 +142,6 @@ class ServerProtocol(base.BaseProtocol):
             self.sounds.pop(sound.id)
             self.sound_ids.push(sound.id)
 
-    @contextmanager
-    def block_color(self):
-        id = self.color_ids.pop()
-        yield id
-        self.color_ids.push(id)
-
     @util.static_vars(wrapper=textwrap.TextWrapper(width=MAX_CHAT_SIZE))
     def broadcast_message(self, message: str, chat_type=CHAT.SYSTEM, player_id=0xFF, predicate=None):
         chat_message.chat_type = chat_type
@@ -173,14 +164,14 @@ class ServerProtocol(base.BaseProtocol):
         predicate = (lambda conn: conn.team == team) if team else None
         return self.broadcast_message(message, chat_type=CHAT.BIG, predicate=predicate)
 
-    async def set_fog_color(self, r: int, g: int, b: int, save=True):
+    def set_fog_color(self, r: int, g: int, b: int, save=True):
         r &= 255
         g &= 255
         b &= 255
         if save:
             self.fog_color = (r, g, b)
         fog_color.color.rgb = r, g, b
-        return self.broadcast_loader(fog_color)
+        self.broadcast_loader(fog_color)
 
     async def player_joined(self, conn: 'connection.ServerConnection'):
         print(f"player join {conn.id}")
@@ -240,6 +231,50 @@ class ServerProtocol(base.BaseProtocol):
         connection.ServerConnection.on_player_join += self.player_joined
         connection.ServerConnection.on_player_leave += self.player_left
         connection.ServerConnection.on_player_connect += self.send_entity_carriers
+
+    def build_block(self, x: int, y: int, z: int, color: tuple) -> bool:
+        hook = connection.ServerConnection.try_build_block(None, x, y, z)
+        if hook is False:
+            return False
+        if hook is not None:
+            x, y, z = hook
+
+        if self.map.build_point(x, y, z, color):
+            set_color.player_id = 32
+            set_color.color.rgb = color
+            self.broadcast_loader(set_color)
+            block_action.player_id = 32
+            block_action.xyz = (x, y, z)
+            block_action.value = ACTION.BUILD
+            self.broadcast_loader(block_action)
+            self.loop.create_task(connection.ServerConnection.on_build_block(None, x, y, z))
+            return True
+        return False
+
+    def destroy_block(self, x: int, y: int, z: int, destroy_type: ACTION=ACTION.DESTROY):
+        hook = connection.ServerConnection.try_destroy_block(None, x, y, z, destroy_type)
+        if hook is False:
+            return False
+        if hook is not None:
+            x, y, z = hook
+
+        to_destroy = [(x, y, z)]
+        if destroy_type == ACTION.SPADE:
+            to_destroy.extend(((x, y, z - 1), (x, y, z + 1)))
+        elif destroy_type == ACTION.GRENADE:
+            for ax in range(x - 1, x + 2):
+                for ay in range(y - 1, y + 2):
+                    for az in range(z - 1, z + 2):
+                        to_destroy.append((ax, ay, az))
+
+        for ax, ay, az in to_destroy:
+            self.map.destroy_point(ax, ay, az)
+        block_action.player_id = 32
+        block_action.xyz = (x, y, z)
+        block_action.value = destroy_type
+        self.broadcast_loader(block_action)
+        self.loop.create_task(connection.ServerConnection.on_destroy_block(None, x, y, z, destroy_type))
+        return True
 
     def intercept(self, address: enet.Address, data: bytes):
         # Respond to server list query from client

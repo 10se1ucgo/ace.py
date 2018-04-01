@@ -37,19 +37,19 @@ class DiscoScript(Script):
             self.disco_task.cancel()
 
     @commands.command(name="disco")
-    async def disco_cmd(self, connection: ServerConnection):
-        return await self.toggle_disco()
+    def disco_cmd(self, connection: ServerConnection):
+        return self.toggle_disco()
 
-    async def toggle_disco(self):
+    def toggle_disco(self):
         if not self.disco_task or self.disco_task.cancelled():
-            await self.protocol.broadcast_server_message("DISCO PARTY MODE ENABLED!")
+            self.protocol.broadcast_server_message("DISCO PARTY MODE ENABLED!")
             self.disco_task = self.protocol.loop.create_task(self.disco())
-            await self.disco_sound.play()
+            self.disco_sound.play()
         else:
-            await self.protocol.broadcast_server_message("The party has been stopped.")
+            self.protocol.broadcast_server_message("The party has been stopped.")
             self.disco_task.cancel()
             self.disco_task = None
-            await self.disco_sound.stop()
+            self.disco_sound.stop()
 
     async def disco(self, num=None):
         original = self.protocol.fog_color
@@ -59,10 +59,10 @@ class DiscoScript(Script):
             else:
                 iterator = itertools.chain.from_iterable(itertools.repeat(COLORS, num))
             for color in iterator:
-                await self.protocol.set_fog_color(*color, save=False)
+                self.protocol.set_fog_color(*color, save=False)
                 await asyncio.sleep(1/3)
         finally:
-            await self.protocol.set_fog_color(*original)
+            self.protocol.set_fog_color(*original)
 
     async def on_game_end(self, winner: types.Team):
         await self.disco(3)

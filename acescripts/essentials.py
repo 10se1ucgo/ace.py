@@ -15,28 +15,28 @@ from acescripts import Script, commands
 
 class EssentialsScript(Script):
     @commands.command(admin=True)
-    async def setpos(self, connection: ServerConnection, x: float, y: float, z: float=None):
+    def setpos(self, connection: ServerConnection, x: float, y: float, z: float=None):
         connection.set_position(x, y, z)
 
     @commands.command(admin=True)
-    async def sethp(self, connection: ServerConnection, hp: int):
+    def sethp(self, connection: ServerConnection, hp: int):
         connection.set_hp(hp)
 
     @commands.command(admin=True)
-    async def hurt(self, connection: ServerConnection, hp: int):
+    def hurt(self, connection: ServerConnection, hp: int):
         connection.hurt(hp)
 
     @commands.command(admin=True)
-    async def tp(self, connection: ServerConnection, other: ServerConnection):
+    def tp(self, connection: ServerConnection, other: ServerConnection):
         connection.set_position(*other.position.xyz)
 
     @commands.command(admin=True)
-    async def goto(self, connection: ServerConnection, grid_pos: str):
+    def goto(self, connection: ServerConnection, grid_pos: str):
         x, y = self.protocol.map.from_grid(grid_pos)
         connection.set_position(x, y)
 
     @commands.command(admin=True)
-    async def spawn(self, connection: ServerConnection, type: types.Entity, num: int=1, x: float=None, y: float=None, z: float=None):
+    def spawn(self, connection: ServerConnection, type: types.Entity, num: int=1, x: float=None, y: float=None, z: float=None):
         for j in range(num):
             if x is None or y is None:
                 pos = connection.protocol.mode.get_random_pos(connection.team)
@@ -47,16 +47,20 @@ class EssentialsScript(Script):
             self.protocol.create_entity(ent_type=type, position=pos, team=connection.team)
 
     @commands.command(admin=True)
-    async def test_raycast(self, connection: ServerConnection):
+    def cast(self, connection: ServerConnection):
+        self.protocol.loop.create_task(self.test32(connection))
+
+    async def test32(self, connection: ServerConnection):
         while True:
+            print("yo")
             pos = cast_ray(connection.protocol.map, connection.position, connection.orientation, length=256)
             if not pos:
-                continue
-            connection.destroy_block(*pos)
+                break
+            connection.protocol.destroy_block(*pos)
             await asyncio.sleep(1 / 10)
 
     @commands.command(admin=True)
-    async def grenade(self, connection: ServerConnection, x: float, y: float, z: float, a: float=0, b: float=0, c: float=0):
+    def grenade(self, connection: ServerConnection, x: float, y: float, z: float, a: float=0, b: float=0, c: float=0):
         obj = self.protocol.create_object(types.Grenade, connection, (x, y, z), (a, b, c))
         eta, pos = obj.next_collision(dt=1/60, max=20)
         if eta is not False:
@@ -64,8 +68,8 @@ class EssentialsScript(Script):
         obj.broadcast_item()
 
     @commands.command(admin=True)
-    async def fog(self, connection: ServerConnection, r: int, g: int, b: int):
-        await self.protocol.set_fog_color(r, g, b)
+    def fog(self, connection: ServerConnection, r: int, g: int, b: int):
+        self.protocol.set_fog_color(r, g, b)
 
 
 def init(protocol: ServerProtocol):

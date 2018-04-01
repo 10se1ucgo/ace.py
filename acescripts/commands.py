@@ -120,32 +120,29 @@ class CommandsScript(Script):
         if not fragments:
             return
 
-        self.protocol.loop.create_task(self.real_try_chat(connection, fragments))
-        return False
-
-    async def real_try_chat(self, connection: ServerConnection, fragments: list):
         command_name = fragments[0]
         command = self.commands.get(command_name)
         if not command:
             connection.send_server_message("That command doesn't exist.")
-            return
+            return False
         if not can_invoke(connection, command):
             connection.send_server_message("You do not have permission to use that command.")
-            return
+            return False
 
         try:
-            await command(connection, fragments[1:])
+            command(connection, fragments[1:])
         except Exception:
             connection.send_server_message(f"Error executing command {command.name}, not enough or malformed arguments")
             print(f"Ignoring error in command {command.name}", file=sys.stderr)
             traceback.print_exc()
+        return False
 
     async def on_player_connect(self, connection: ServerConnection):
         if ipaddress.ip_address(connection.peer.address.host).is_private:
             connection.store["commands_admin"] = True
 
     @command()
-    async def login(self, connection: ServerConnection, password: str):
+    def login(self, connection: ServerConnection, password: str):
         if password in self.config.get("admin_passwords", ()):
             connection.store["commands_admin"] = True
             connection.send_server_message("You logged in as an admin -- all rights granted.")

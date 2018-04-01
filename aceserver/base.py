@@ -47,7 +47,7 @@ class BaseProtocol:
             except Exception:
                 print("Ignoring exception in update(): ")
                 traceback.print_exc()
-            await asyncio.sleep(1 / 50)
+            await asyncio.sleep(1 / 30)
             # print(self.time, dt, 1 / dt)
             last = now
 

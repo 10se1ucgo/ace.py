@@ -74,16 +74,13 @@ class ServerConnection(base.BaseConnection):
             print(f"Malformed packet from player #{self.id}, disconnecting.", file=sys.stderr)
             traceback.print_exc()
             return self.disconnect()
-        self.protocol.loop.create_task(self.received_loader(loader))
+        self.received_loader(loader)
 
     def _send_loader(self, writer: ByteWriter, flags=enet.PACKET_FLAG_RELIABLE):
         packet: enet.Packet = enet.Packet(bytes(writer), flags)
         self.peer.send(0, packet)
 
     def send_loader(self, loader: packets.Loader, flags=enet.PACKET_FLAG_RELIABLE):
-        # does this even DO anything?? enet just queues the packet for the next host_service call...
-        # perhaps sending doesnt need to be coros, but receiving should.
-        # please send help i have no clue what im doing
         return self._send_loader(loader.generate(), flags)
 
     def disconnect(self, reason: DISCONNECT=DISCONNECT.UNDEFINED):
@@ -152,7 +149,7 @@ class ServerConnection(base.BaseConnection):
                         break
                     pack_chunk.data = data
                     self.send_loader(pack_chunk)
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(0.1)
 
     async def send_map(self):
         map = self.protocol.map
@@ -165,7 +162,7 @@ class ServerConnection(base.BaseConnection):
                 continue
             map_chunk.data = chunk
             self.send_loader(map_chunk)
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.1)
 
     def send_state(self):
         data = self.protocol.get_state()
@@ -214,11 +211,11 @@ class ServerConnection(base.BaseConnection):
         set_hp.source.xyz = source
         self.send_loader(set_hp)
 
-    async def kill(self, kill_type: KILL=KILL.FALL, killer: 'ServerConnection'=None, respawn_time=None):
+    def kill(self, kill_type: KILL=KILL.FALL, killer: 'ServerConnection'=None, respawn_time=None):
         if self.dead or self.store.get("respawn_task") is not None: return
 
         respawn_time = respawn_time or self.protocol.get_respawn_time()
-        hook = await self.try_player_kill(self, kill_type, killer, respawn_time)
+        hook = self.try_player_kill(self, kill_type, killer, respawn_time)
         if hook is False:
             return
         respawn_time = hook or respawn_time
@@ -254,7 +251,7 @@ class ServerConnection(base.BaseConnection):
         damage = damage if hook is None else hook
         self.set_hp(self.hp - damage, reason, source)
         if self.hp <= 0:
-            self.protocol.loop.create_task(self.kill(cause, damager))
+            self.kill(cause, damager)
         else:
             self.protocol.loop.create_task(self.on_player_hurt(self, damage, damager, reason))
 
@@ -276,7 +273,7 @@ class ServerConnection(base.BaseConnection):
         if self.weapon.type == weapon:
             return
         self.weapon = weapons.WEAPONS[weapon](self)
-        self.protocol.loop.create_task(self.kill(KILL.CLASS_CHANGE, respawn_time=respawn_time))
+        self.kill(KILL.CLASS_CHANGE, respawn_time=respawn_time)
 
     def set_team(self, team: TEAM, respawn_time=None):
         # TODO hooks
@@ -287,7 +284,7 @@ class ServerConnection(base.BaseConnection):
         if old_team.spectator:
             self.spawn()
         else:
-            self.protocol.loop.create_task(self.kill(KILL.TEAM_CHANGE, respawn_time=respawn_time))
+            self.kill(KILL.TEAM_CHANGE, respawn_time=respawn_time)
 
     def destroy_block(self, x: int, y: int, z: int, destroy_type: ACTION=ACTION.DESTROY):
         hook = self.try_destroy_block(self, x, y, z, destroy_type)
@@ -388,7 +385,7 @@ class ServerConnection(base.BaseConnection):
         [tool.restock() for tool in self.tools]
         self.send_loader(restock)
 
-    async def play_sound(self, sound: types.Sound):
+    def play_sound(self, sound: types.Sound):
         pkt = sound.to_play_sound()
         self.send_loader(pkt)
 
@@ -418,7 +415,6 @@ class ServerConnection(base.BaseConnection):
 
         px, py, pz = loader.data.p.xyz
         ox, oy, oz = loader.data.o.xyz
-        print(f"{ox} {oy} {oz}")
         if util.bad_float(px, py, pz, ox, oy, oz):
             return self.disconnect()
 
@@ -580,6 +576,11 @@ class ServerConnection(base.BaseConnection):
         if self.dead:
             return
 
+        # TODO our own raycasting and hack detection etc.
+        other = self.protocol.players.get(loader.player_id)
+        if other is None:
+            return
+
         if loader.value != HIT.MELEE:
             if self.mounted_entity:
                 if not isinstance(self.mounted_entity, types.MachineGun) or not self.mounted_entity.check_rapid():
@@ -594,16 +595,7 @@ class ServerConnection(base.BaseConnection):
                 eye = self.eye
             else:
                 return
-        else:
-            if self.tool_type != TOOL.SPADE or not self.tool.check_rapid():
-                return
 
-        # TODO our own raycasting and hack detection etc.
-        other = self.protocol.players.get(loader.player_id)
-        if other is None:
-            return
-
-        if loader.value != HIT.MELEE:
             vec = (other.eye - eye).normalized
             if self.orientation.dot(vec) <= 0.9:
                 print(f"incorrect orientation to hit for {self!r}")
@@ -615,17 +607,17 @@ class ServerConnection(base.BaseConnection):
                 damage = self.mounted_entity.get_damage(loader.value, other.position.distance(self.position))
                 cause = KILL.ENTITY
             else:
-                damage = self.tool.get_damage(loader.value, other.position.distance(self.position))
+                damage = self.weapon.get_damage(loader.value, other.position.distance(self.position))
                 cause = KILL.HEADSHOT if loader.value == HIT.HEAD else KILL.WEAPON
         else:
+            if self.tool_type != TOOL.SPADE or not self.tool.check_rapid():
+                return
             if other.position.distance(self.position) > MELEE_DISTANCE:
                 return
+
             damage = 50
             cause = KILL.MELEE
 
-        if damage is None:
-            return
-        print("?")
         other.hurt(damage=damage, cause=cause, damager=self)
 
     @on_loader_receive(packets.PlaceMG)
@@ -664,7 +656,7 @@ class ServerConnection(base.BaseConnection):
 
     @score.setter
     def score(self, value):
-        self._score = max(0, min(int(self._score), 255))
+        self._score = max(0, min(int(value), 255))
         set_score.type = SCORE.PLAYER
         set_score.specifier = self.id
         set_score.value = self._score

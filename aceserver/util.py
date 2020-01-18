@@ -80,7 +80,7 @@ class AsyncEvent(Event):
             raise TypeError("Event handler must be a coroutine.")
         return super().__iadd__(other)
 
-    # todo this is literally the same as Event.__call__ except with async and await isntead. Is there a better way?
+    # todo this is literally the same as Event.__call__ except with async and await instead. Is there a better way?
     async def __call__(self, *args, **kwargs):
         dirty = False
         for ref in self._funcs:

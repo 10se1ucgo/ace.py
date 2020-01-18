@@ -263,6 +263,7 @@ class ServerConnection(base.BaseConnection):
         self.tool.set_primary(False)
         self.tool.set_secondary(False)
         self.tool_type = tool
+        self.wo.set_weapon(tool in (TOOL.WEAPON, TOOL.SNIPER))
 
         set_tool.player_id = self.id
         set_tool.value = tool
@@ -308,7 +309,7 @@ class ServerConnection(base.BaseConnection):
             if self.mounted_entity:
                 if not isinstance(self.mounted_entity, types.MachineGun) or not self.mounted_entity.check_rapid():
                     return
-            elif not self.tool.check_rapid(primary=True, times=2):
+            elif not self.tool.check_rapid(primary=True, times=1 if self.weapon.type == WEAPON.SHOTGUN else 2):
                 return False
             self.block.destroy()
 
@@ -527,7 +528,6 @@ class ServerConnection(base.BaseConnection):
     def recv_set_tool(self, loader: packets.SetTool):
         if self.dead: return
 
-        self.wo.set_weapon(loader.value in (TOOL.WEAPON, TOOL.SNIPER))
         self.set_tool(loader.value)
 
     @on_loader_receive(packets.SetColor)
@@ -686,13 +686,11 @@ class ServerConnection(base.BaseConnection):
     def dead(self) -> bool:
         return not self.wo or self.wo.dead
 
+    # TODO: I dislike these. The += business was cute at first, but a much cleaner hook system required.
 
-    # TODO more hooks
     # Called after the player connects to the server (after being sent packs, map, game state, etc.)
     # (self) -> None
     on_player_connect = util.AsyncEvent()
-
-
     # Called after the player joins the game (first time spawning)
     # (self) -> None
     on_player_join = util.AsyncEvent()
@@ -707,31 +705,31 @@ class ServerConnection(base.BaseConnection):
     on_player_spawn = util.AsyncEvent()
 
     # Called before/after the player is hurt
-    # (self, damage, damager, position) -> None | `damage` to override | False to cancel
+    # (self, damage, damager, position) -> None | New `damage` to override | False to cancel
     try_player_hurt = util.Event(overridable=True)
     # (self, damage, damager, position) -> None
     on_player_hurt = util.AsyncEvent()
 
     # Called before/after the player dies
-    # (self, kill_type, killer, respawn_time) -> None | `respawn_time` to override | False to cancel
+    # (self, kill_type, killer, respawn_time) -> None | New `respawn_time` to override | False to cancel
     try_player_kill = util.Event(overridable=True)
     # (self, kill_type, killer, respawn_time) -> None
     on_player_kill = util.AsyncEvent()
 
     # Called before/after the player builds
-    # (self, x, y, z) -> None | `x, y, z` to override | False to cancel
+    # (self, x, y, z) -> None | New `x, y, z` to override | False to cancel
     try_build_block = util.Event(overridable=True)
     # (self, x, y, z) -> None
     on_build_block = util.AsyncEvent()
 
     # Called before/after the player destroys
-    # (self, x, y, z, destroy_type) -> None | `x, y, z` to override | False to cancel
+    # (self, x, y, z, destroy_type) -> None | New `x, y, z` to override | False to cancel
     try_destroy_block = util.Event(overridable=True)
     # (self, x, y, z, destroy_type) -> None
     on_destroy_block = util.AsyncEvent()
 
     # Called before/after the player sends a chat message
-    # (self, chat_message, chat_type) -> None | `chat_message` to override | False to cancel
+    # (self, chat_message, chat_type) -> None | New `chat_message` to override | False to cancel
     try_chat_message = util.Event(overridable=True)
     # (self, chat_message, chat_type) -> None
     on_chat_message = util.AsyncEvent()

@@ -93,7 +93,7 @@ class Team:
 class Entity:
     type = None
     mountable = False
-    on_collide = util.AsyncEvent()
+    on_collide = util.Event()
 
     def __init__(self, entity_id: int, protocol: 'protocol.ServerProtocol', position=(0, 0, 0), team=None, carrier=None,
                  yaw: float=0.0):
@@ -126,7 +126,7 @@ class Entity:
 
                 dist = self.position.sq_distance(conn.position)
                 if dist <= 3 ** 2:
-                    self.protocol.loop.create_task(self.on_collide(self, conn))
+                    self.on_collide(self, conn)
 
     def set_team(self, team: Team=None, force=False):
         if self.destroyed:
@@ -188,27 +188,27 @@ class Entity:
 
 class Flag(Entity):
     type = ENTITY.FLAG
-    on_collide = util.AsyncEvent()
+    on_collide = util.Event()
 
 
 class CommandPost(Entity):
     type = ENTITY.COMMAND_POST
-    on_collide = util.AsyncEvent()
+    on_collide = util.Event()
 
 
 class Helicopter(Entity):
     type = ENTITY.HELICOPTER
-    on_collide = util.AsyncEvent()
+    on_collide = util.Event()
 
 
 class AmmoCrate(Entity):
     type = ENTITY.AMMO_CRATE
-    on_collide = util.AsyncEvent()
+    on_collide = util.Event()
 
 
 class HealthCrate(Entity):
     type = ENTITY.HEALTH_CRATE
-    on_collide = util.AsyncEvent()
+    on_collide = util.Event()
 
 
 class MountableEntity(Entity):
@@ -223,13 +223,13 @@ class MountableEntity(Entity):
     async def try_mount(self, connection: 'connection.ServerConnection'):
         if self.carrier is not None:
             if connection is self.carrier:
-                await self.mount(None)
+                self.mount(None)
             else:
                 return
         elif connection.position.sq_distance(self.position) <= 3 ** 2:
-            await self.mount(connection)
+            self.mount(connection)
 
-    async def mount(self, connection):
+    def mount(self, connection):
         if connection is None:
             self.carrier.mounted_entity = None
         else:
@@ -254,11 +254,11 @@ class MachineGun(MountableEntity):
 
     async def player_walk(self, connection, *args):
         if connection is self.carrier and any(args):
-            await self.mount(None)
+            self.mount(None)
 
     async def player_animation(self, connection, *args):
         if connection is self.carrier and any(args):
-            await self.mount(None)
+            self.mount(None)
 
     def check_rapid(self):
         # if self.protocol.time - self.last_fire < (self.MG_SHOOT_RATE - 0.025):

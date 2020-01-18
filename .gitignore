@@ -4,6 +4,7 @@ build/
 *.html
 *.pyd
 *.cpp
+*.log
 !acelib/bytes_c.cpp
 !acelib/math3d_c.cpp
 !acelib/vxl_c.cpp
@@ -18,5 +19,6 @@ packs/
 # from cuwo
 winfix.py
 
+.vs/
 .idea/
 vs/

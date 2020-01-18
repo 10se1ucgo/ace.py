@@ -11,7 +11,7 @@ class CTF(GameMode):
     @property
     def description(self):
         return f"""Infiltrate the enemy base by whatever means, make off with their intel and get back to your base. Watch out, the enemy has similar plans for your intel.
-    
+
 The first team to retrieve their enemies intel {self.score_limit} times wins.
 """
 
@@ -57,7 +57,7 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
     #         await self.protocol.create_entity(ent_type=crate_type, position=pos, team=None)
     #         await asyncio.sleep(10)
 
-    async def on_intel_collide(self, intel: types.Flag, player: ServerConnection):
+    def on_intel_collide(self, intel: types.Flag, player: ServerConnection):
         if intel.team == player.team:
             return
 
@@ -65,7 +65,7 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
         self.protocol.broadcast_hud_message(f"{player} picked up the {intel.team} Intel")
         self.pickup_sound.play()
 
-    async def on_cp_collide(self, base: types.CommandPost, player: ServerConnection):
+    def on_cp_collide(self, base: types.CommandPost, player: ServerConnection):
         if base.team != player.team:
             return
 
@@ -75,10 +75,10 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
 
         for intel in self.intels.values():
             if intel.carrier == player:
-                await self.capture_intel(player, intel)
+                self.capture_intel(player, intel)
 
-    async def capture_intel(self, player: ServerConnection, intel: types.Flag):
-        await self.reset_intel(intel)
+    def capture_intel(self, player: ServerConnection, intel: types.Flag):
+        self.reset_intel(intel)
         player.team.score += 1
         player.score += 10
         self.protocol.broadcast_hud_message(f"{player} captured the {intel.team} Intel")
@@ -92,13 +92,14 @@ The first team to retrieve their enemies intel {self.score_limit} times wins.
             intel.set_position(*player.position.xyz)
             self.protocol.broadcast_hud_message(f"{player} dropped the {intel.team} Intel")
 
-    async def reset_intel(self, intel):
+    def reset_intel(self, intel):
         intel.set_carrier(None)
         intel.set_position(*self.get_random_pos(intel.team))
 
     async def on_player_kill(self, player: ServerConnection, kill_type: KILL, killer: ServerConnection, respawn_time: int):
         await super().on_player_kill(player, kill_type, killer, respawn_time)
         await self.drop_intel(player)
+
 
 def init(protocol: ServerProtocol):
     return CTF(protocol)

@@ -26,6 +26,14 @@ class EssentialsScript(Script):
     def hurt(self, connection: ServerConnection, hp: int):
         connection.hurt(hp)
 
+    @commands.command()
+    def kill(self, connection: ServerConnection):
+        connection.hurt(1000)
+
+    @commands.command(admin=True)
+    def restock(self, connection: ServerConnection):
+        connection.restock()
+
     @commands.command(admin=True)
     def tp(self, connection: ServerConnection, other: ServerConnection):
         connection.set_position(*other.position.xyz)
@@ -52,12 +60,11 @@ class EssentialsScript(Script):
 
     async def test32(self, connection: ServerConnection):
         while True:
-            print("yo")
             pos = cast_ray(connection.protocol.map, connection.position, connection.orientation, length=256)
             if not pos:
                 break
             connection.protocol.destroy_block(*pos)
-            await asyncio.sleep(1 / 10)
+            await asyncio.sleep(1 / 60)
 
     @commands.command(admin=True)
     def grenade(self, connection: ServerConnection, x: float, y: float, z: float, a: float=0, b: float=0, c: float=0):

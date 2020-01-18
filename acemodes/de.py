@@ -61,7 +61,7 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
         self.bombsite_a.destroy()
         self.bombsite_b.destroy()
 
-    async def on_pickup_bomb(self, bomb: C4, player: ServerConnection):
+    def on_pickup_bomb(self, bomb: C4, player: ServerConnection):
         if bomb is not self.bomb: return
 
         if player.team is self.terrorists:
@@ -71,7 +71,7 @@ Defuse the C4 explosive or eliminate the Terrorists before they plant it.
         elif player.team is self.counter_terrorists and bomb.planter is not None:
             pass # todo
 
-    async def on_site_collide(self, site: types.CommandPost, player: ServerConnection):
+    def on_site_collide(self, site: types.CommandPost, player: ServerConnection):
         if self.bomb.carrier is not player or player.team is not self.terrorists: return
         if self.bomb.planter: return
 

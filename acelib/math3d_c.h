@@ -3,7 +3,8 @@
 #include <algorithm>
 #include <iostream>
 
-// i should just use a library :thinking:
+// TODO: Replace with glm
+// TODO: Replace Cython with pybind11 :flushed:
 
 namespace detail {
     template<typename T>
@@ -30,9 +31,6 @@ struct Vector3 {
     T x, y, z;
 
     explicit Vector3(T x=0, T y=0, T z=0) : x(x), y(y), z(z) {
-    }
-
-    Vector3(const Vector3<T> &other) : x(other.x), y(other.y), z(other.z) {
     }
 
     void set(T x, T y, T z);
@@ -164,23 +162,23 @@ Vector3<T> Vector3<T>::min(const Vector3<T> &other) const {
 }
 
 template<typename T>
-Vector3<T> Vector3<T>::operator+(const Vector3<T> &other) const {
-    return Vector3(this->x + other.x, this->y + other.y, this->z + other.z);
+Vector3<T> Vector3<T>::operator+(const Vector3<T> &b) const {
+    return Vector3(this->x + b.x, this->y + b.y, this->z + b.z);
 }
 
 template<typename T>
-Vector3<T> Vector3<T>::operator-(const Vector3<T> &other) const {
-    return Vector3(this->x - other.x, this->y - other.y, this->z - other.z);
+Vector3<T> Vector3<T>::operator-(const Vector3<T> &b) const {
+    return Vector3(this->x - b.x, this->y - b.y, this->z - b.z);
 }
 
 template<typename T>
-Vector3<T> Vector3<T>::operator*(const T &other) const {
-    return Vector3(this->x * other, this->y * other, this->z * other);
+Vector3<T> Vector3<T>::operator*(const T &b) const {
+    return Vector3(this->x * b, this->y * b, this->z * b);
 }
 
 template<typename T>
-Vector3<T> Vector3<T>::operator/(const T &other) const {
-    return Vector3(this->x / other, this->y / other, this->z / other);
+Vector3<T> Vector3<T>::operator/(const T &b) const {
+    return Vector3(this->x / b, this->y / b, this->z / b);
 }
 
 template<typename T>

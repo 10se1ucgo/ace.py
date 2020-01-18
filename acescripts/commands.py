@@ -105,7 +105,7 @@ class CommandsScript(Script):
                 self.commands[alias] = command
 
     def remove_commands(self, klass):
-        for command in self.commands.copy().values():
+        for command in list(self.commands.values()):
             if command.instance is klass:
                 command.instance = None
                 for alias in command.aliases:

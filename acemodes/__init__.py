@@ -54,13 +54,13 @@ class GameMode:
     def update(self, dt: float):
         pass
 
-    async def on_health_crate(self, crate: types.HealthCrate, connection: 'connection.ServerConnection'):
+    def on_health_crate(self, crate: types.HealthCrate, connection: 'connection.ServerConnection'):
         connection.set_hp(100)
         crate.destroy()
 
-    async def on_ammo_crate(self, crate: types.AmmoCrate, connection: 'connection.ServerConnection'):
+    def on_ammo_crate(self, crate: types.AmmoCrate, connection: 'connection.ServerConnection'):
         connection.weapon.restock()
-        await connection.weapon.send_ammo()
+        self.protocol.loop.create_task(connection.weapon.send_ammo())
         crate.destroy()
 
     async def on_player_kill(self, player: 'connection.ServerConnection', kill_type: constants.KILL, killer: 'connection.ServerConnection',
@@ -87,7 +87,7 @@ class GameMode:
 
 def get_game_mode(protocol: 'protocol.ServerProtocol', mode_name: str) -> GameMode:
     module = importlib.import_module(f"acemodes.{mode_name}")
-    mode = module.start(protocol)
+    mode = module.init(protocol)
     if not isinstance(mode, GameMode):
         raise TypeError(f"Mode {mode_name} did not return a GameMode instance!")
     return mode

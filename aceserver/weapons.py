@@ -37,7 +37,7 @@ class Tool:
 
         if self.secondary_rate:
             if self.secondary_ammo > 0 and self.secondary and self.connection.protocol.time >= self.next_secondary:
-                self.next_secondary = self.connection.protocol.time + self.primary_rate
+                self.next_secondary = self.connection.protocol.time + self.secondary_rate
                 self.on_secondary()
 
     def set_primary(self, primary: bool):
@@ -68,11 +68,11 @@ class Tool:
 
         last_use = getattr(self, "last_" + type)
         setattr(self, "last_" + type, time)
-        rate = (getattr(self, type + "_rate") * times) - 0.025  # TODO random constants REEEE
+        rate = (getattr(self, type + "_rate") * times) - (0.025 + self.connection.peer.roundTripTime / 1000)  # TODO random constants REEEE
 
-        if time - last_use < rate:
-            return False
-        return True
+        # print(time - last_use, rate, time - last_use >= rate)
+
+        return time - last_use >= rate
 
     def reset(self):
         pass
@@ -181,6 +181,7 @@ class Weapon(Tool):
         if self.primary_ammo <= 0:
             return False
         self.primary_ammo -= 1
+        # print(self.primary_ammo)
         return True
 
     def on_secondary(self):

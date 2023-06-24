@@ -271,7 +271,7 @@ class MachineGun(MountableEntity):
 
 
 
-ENTITIES = {cls.type: cls for cls in Entity.__subclasses__() if cls.type in ENTITY}
+ENTITIES = {cls.type: cls for cls in Entity.__subclasses__() if cls.type is not None and cls.type in ENTITY}
 
 
 class Explosive:
